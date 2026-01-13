@@ -1,4 +1,7 @@
-// BASIC SETUP
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+// SETUP
 const canvas = document.getElementById("scene");
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x111111);
@@ -15,7 +18,7 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 // CONTROLS
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
+const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 // LIGHTS
@@ -35,7 +38,7 @@ scene.add(floor);
 // MATERIAL
 const mat = new THREE.MeshStandardMaterial({ color: 0x888888 });
 
-// HUMANOID (HIERARCHY MATTERS)
+// CHARACTER GROUP
 const character = new THREE.Group();
 scene.add(character);
 
@@ -48,7 +51,7 @@ const head = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), mat);
 head.position.y = 1.1;
 torso.add(head);
 
-// ARM FUNCTION
+// ARM
 function createArm(x) {
   const shoulder = new THREE.Group();
   shoulder.position.set(x, 0.6, 0);
@@ -68,12 +71,10 @@ function createArm(x) {
   return shoulder;
 }
 
-const leftArm = createArm(-0.65);
-const rightArm = createArm(0.65);
-torso.add(leftArm);
-torso.add(rightArm);
+torso.add(createArm(-0.65));
+torso.add(createArm(0.65));
 
-// LEG FUNCTION
+// LEGS
 function createLeg(x) {
   const hip = new THREE.Group();
   hip.position.set(x, -0.75, 0);
@@ -93,10 +94,8 @@ function createLeg(x) {
   return hip;
 }
 
-const leftLeg = createLeg(-0.3);
-const rightLeg = createLeg(0.3);
-torso.add(leftLeg);
-torso.add(rightLeg);
+torso.add(createLeg(-0.3));
+torso.add(createLeg(0.3));
 
 // INTERACTION
 const raycaster = new THREE.Raycaster();
@@ -107,38 +106,33 @@ window.addEventListener("mousedown", (e) => {
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
-
   const hits = raycaster.intersectObjects(character.children, true);
-  if (hits.length > 0) {
-    selected = hits[0].object.parent;
-  }
+  if (hits.length) selected = hits[0].object.parent;
 });
 
 window.addEventListener("mousemove", (e) => {
-  if (!selected) return;
-  selected.rotation.z += e.movementX * 0.005;
+  if (selected) selected.rotation.z += e.movementX * 0.005;
 });
 
 window.addEventListener("mouseup", () => {
   selected = null;
 });
 
-// SAVE / LOAD POSE
-function serialize(group) {
+// SAVE / LOAD
+function serialize(g) {
   return {
-    rotation: group.rotation.toArray(),
-    children: group.children.map(serialize),
+    r: g.rotation.toArray(),
+    c: g.children.map(serialize),
   };
 }
 
-function apply(group, data) {
-  group.rotation.fromArray(data.rotation);
-  group.children.forEach((c, i) => apply(c, data.children[i]));
+function apply(g, d) {
+  g.rotation.fromArray(d.r);
+  g.children.forEach((c, i) => apply(c, d.c[i]));
 }
 
 document.getElementById("savePose").onclick = () => {
-  const data = serialize(character);
-  const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(serialize(character))], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "pose.json";
@@ -149,12 +143,10 @@ document.getElementById("loadPose").onclick = () =>
   document.getElementById("poseFile").click();
 
 document.getElementById("poseFile").onchange = (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  file.text().then((t) => apply(character, JSON.parse(t)));
+  e.target.files[0]?.text().then(t => apply(character, JSON.parse(t)));
 };
 
-// EXPORT IMAGE
+// EXPORT PNG
 document.getElementById("exportImage").onclick = () => {
   renderer.render(scene, camera);
   const a = document.createElement("a");
