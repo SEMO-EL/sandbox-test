@@ -1,26 +1,242 @@
 <!DOCTYPE html>
 <html lang="en">
+<!--
+  Pose Sandbox — GitHub Pages friendly
+  - Uses ES Modules + Import Map
+  - Three.js + OrbitControls + TransformControls
+  - Single-page app: UI + canvas
+-->
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pose Sandbox</title>
-  <link rel="stylesheet" href="./styles.css" />
-</head>
-<body>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <meta name="description" content="Pose Sandbox: pose a simple 3D character, place props, save/load poses, export PNG." />
+  <meta name="theme-color" content="#0b0f17" />
 
-  <div id="ui">
-    <button id="savePose">Save Pose</button>
-    <button id="loadPose">Load Pose</button>
-    <button id="exportImage">Export PNG</button>
-    <input type="file" id="poseFile" accept=".json" hidden />
+  <title>Pose Sandbox</title>
+
+  <!-- Font (fast + pretty) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="./styles.css" />
+
+  <!-- Import Map: bare specifiers work in browser without bundler -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+
+<body>
+  <!-- Top bar -->
+  <header class="topbar" role="banner">
+    <div class="brand">
+      <div class="brand__mark" aria-hidden="true">◼</div>
+      <div class="brand__text">
+        <div class="brand__title">Pose Sandbox</div>
+        <div class="brand__subtitle">Character posing • Props • Export</div>
+      </div>
+    </div>
+
+    <div class="topbar__actions">
+      <button class="btn btn--ghost" id="btnHelp" type="button" aria-haspopup="dialog" aria-controls="helpModal">
+        Help
+      </button>
+      <button class="btn btn--ghost" id="btnPerf" type="button" title="Toggle performance overlay">
+        Perf
+      </button>
+      <button class="btn btn--primary" id="btnExport" type="button" title="Export current view as PNG">
+        Export PNG
+      </button>
+    </div>
+  </header>
+
+  <!-- App layout -->
+  <main class="app" role="main">
+    <!-- Left sidebar -->
+    <aside class="panel" aria-label="Tools and controls">
+      <section class="panel__section">
+        <h2 class="panel__title">Selection</h2>
+        <div class="hint">
+          Click a joint or prop in the 3D view.
+          Then use the rotate gizmo.
+        </div>
+
+        <div class="row">
+          <label class="label" for="selectionName">Selected</label>
+          <input id="selectionName" class="input" type="text" value="None" readonly />
+        </div>
+
+        <div class="row row--split">
+          <button class="btn" id="btnFocus" type="button" title="Frame the selected object">
+            Focus
+          </button>
+          <button class="btn" id="btnClear" type="button" title="Clear selection">
+            Clear
+          </button>
+        </div>
+      </section>
+
+      <section class="panel__section">
+        <h2 class="panel__title">Gizmo</h2>
+        <div class="row row--split">
+          <button class="btn btn--active" id="modeRotate" type="button">Rotate</button>
+          <button class="btn" id="modeOrbit" type="button">Orbit</button>
+        </div>
+
+        <div class="row">
+          <label class="label">Axis lock</label>
+          <div class="chips" role="group" aria-label="Axis lock">
+            <button class="chip chip--active" id="axisX" type="button">X</button>
+            <button class="chip chip--active" id="axisY" type="button">Y</button>
+            <button class="chip chip--active" id="axisZ" type="button">Z</button>
+          </div>
+        </div>
+
+        <div class="row">
+          <label class="label" for="rotateSnap">Rotate snap</label>
+          <select id="rotateSnap" class="select">
+            <option value="0">Off</option>
+            <option value="5">5°</option>
+            <option value="10" selected>10°</option>
+            <option value="15">15°</option>
+            <option value="30">30°</option>
+            <option value="45">45°</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label class="label">Visual aids</label>
+          <div class="toggles">
+            <label class="toggle">
+              <input id="togGrid" type="checkbox" checked />
+              <span>Grid</span>
+            </label>
+            <label class="toggle">
+              <input id="togAxes" type="checkbox" />
+              <span>Axes</span>
+            </label>
+            <label class="toggle">
+              <input id="togOutline" type="checkbox" checked />
+              <span>Outline</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel__section">
+        <h2 class="panel__title">Pose</h2>
+
+        <div class="row row--split">
+          <button class="btn" id="btnResetPose" type="button" title="Reset joint rotations">
+            Reset
+          </button>
+          <button class="btn" id="btnRandomPose" type="button" title="Randomize pose (mild)">
+            Random
+          </button>
+        </div>
+
+        <div class="row row--split">
+          <button class="btn btn--primary" id="btnSavePose" type="button" title="Download pose.json">
+            Save JSON
+          </button>
+          <button class="btn" id="btnLoadPose" type="button" title="Load pose.json from your computer">
+            Load JSON
+          </button>
+          <input id="filePose" type="file" accept=".json" hidden />
+        </div>
+
+        <div class="row">
+          <label class="label" for="poseNotes">Notes</label>
+          <textarea id="poseNotes" class="textarea" rows="3" placeholder="Optional: write pose notes..."></textarea>
+        </div>
+      </section>
+
+      <section class="panel__section">
+        <h2 class="panel__title">Props</h2>
+        <div class="hint">Basic decorations you can pose too.</div>
+
+        <div class="row row--split">
+          <button class="btn" id="btnAddCube" type="button">Add Cube</button>
+          <button class="btn" id="btnAddSphere" type="button">Add Sphere</button>
+        </div>
+
+        <div class="row row--split">
+          <button class="btn" id="btnDelProp" type="button" title="Delete selected prop (if prop)">
+            Delete
+          </button>
+          <button class="btn" id="btnScatter" type="button" title="Scatter a few props">
+            Scatter
+          </button>
+        </div>
+
+        <div class="row">
+          <label class="label" for="bgTone">Background</label>
+          <select id="bgTone" class="select">
+            <option value="midnight" selected>Midnight</option>
+            <option value="studio">Studio</option>
+            <option value="graphite">Graphite</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="panel__section panel__section--footer">
+        <div class="tiny">
+          Tip: Use <kbd>Esc</kbd> to clear selection. Use <kbd>F</kbd> to focus selection.
+        </div>
+        <div class="tiny tiny--muted">
+          Built for GitHub Pages. No bundler. No nonsense.
+        </div>
+      </section>
+    </aside>
+
+    <!-- Viewport -->
+    <section class="viewport" aria-label="3D viewport">
+      <canvas id="c" class="canvas" aria-label="3D canvas"></canvas>
+
+      <!-- error overlay (populated by JS if something fails) -->
+      <div id="errorOverlay" class="error hidden" role="alert">
+        <div class="error__title">Render failed</div>
+        <pre id="errorText" class="error__text"></pre>
+      </div>
+
+      <!-- bottom hint -->
+      <div class="toast" id="toast" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <!-- Help modal -->
+  <div class="modal hidden" id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="modal__backdrop" data-close="true"></div>
+    <div class="modal__card">
+      <div class="modal__header">
+        <h3 id="helpTitle" class="modal__title">Help</h3>
+        <button class="iconbtn" id="btnCloseHelp" type="button" aria-label="Close help">✕</button>
+      </div>
+      <div class="modal__body">
+        <ul class="help">
+          <li><b>Select:</b> click a joint or prop in the 3D view.</li>
+          <li><b>Rotate:</b> use the gizmo rings. Toggle axes X/Y/Z.</li>
+          <li><b>Orbit:</b> use Orbit mode to move camera freely.</li>
+          <li><b>Save:</b> downloads a JSON of joint rotations + prop transforms.</li>
+          <li><b>Export:</b> downloads a PNG of the current view.</li>
+        </ul>
+        <div class="help__note">
+          If your screen is blank, hard-refresh (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>) and check Console.
+        </div>
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--primary" id="btnHelpOk" type="button">Got it</button>
+      </div>
+    </div>
   </div>
 
-  <canvas id="scene"></canvas>
-
-  <!-- STABLE GLOBAL THREE (NO MODULES, NO IMPORT MAPS) -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.149.0/examples/js/controls/OrbitControls.js"></script>
-
-  <script src="./script.js"></script>
+  <!-- App -->
+  <script type="module" src="./app.js"></script>
 </body>
 </html>
