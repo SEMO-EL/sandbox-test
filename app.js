@@ -45,6 +45,13 @@ const btnCloseHelp = document.getElementById("btnCloseHelp");
 const btnHelpOk = document.getElementById("btnHelpOk");
 const btnPerf = document.getElementById("btnPerf");
 
+/* New: Pose Gallery DOM */
+const btnSaveGallery = document.getElementById("btnSaveGallery");
+const poseGallery = document.getElementById("poseGallery");
+const btnRenamePose = document.getElementById("btnRenamePose");
+const btnDeletePose = document.getElementById("btnDeletePose");
+const btnClearGallery = document.getElementById("btnClearGallery");
+
 /* Helpers */
 function showToast(msg, ms = 1400) {
   toast.textContent = msg;
@@ -65,6 +72,26 @@ function clamp(v, a, b) {
 
 function degToRad(d) {
   return (d * Math.PI) / 180;
+}
+
+function safeJsonParse(s, fallback) {
+  try { return JSON.parse(s); } catch { return fallback; }
+}
+
+function nowISO() {
+  return new Date().toISOString();
+}
+
+function niceTime(iso) {
+  // no libs: cheap readable timestamp
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
 }
 
 /* Three globals */
@@ -91,6 +118,210 @@ const world = {
   joints: [],
   props: []
 };
+
+/* ---------------------------- Pose Gallery ---------------------------- */
+const GALLERY = {
+  key: "pose_sandbox_gallery_v1",
+  maxItems: 30
+};
+
+let galleryItems = [];     // array of {id,name,createdAt,notes,pose,thumb}
+let gallerySelectedId = null;
+
+function loadGalleryFromStorage() {
+  const raw = localStorage.getItem(GALLERY.key);
+  galleryItems = safeJsonParse(raw, []);
+  if (!Array.isArray(galleryItems)) galleryItems = [];
+  galleryItems = galleryItems.filter(it => it && typeof it === "object" && it.id && it.pose && it.thumb);
+  if (galleryItems.length > GALLERY.maxItems) galleryItems = galleryItems.slice(0, GALLERY.maxItems);
+}
+
+function saveGalleryToStorage() {
+  try {
+    localStorage.setItem(GALLERY.key, JSON.stringify(galleryItems));
+  } catch (e) {
+    // If storage fails (quota), keep working without crashing
+    console.warn("Gallery save failed:", e);
+    showToast("Gallery save failed (storage full?)", 1800);
+  }
+}
+
+function uid() {
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function ensureGallerySelectionValid() {
+  if (!gallerySelectedId) return;
+  const exists = galleryItems.some(it => it.id === gallerySelectedId);
+  if (!exists) gallerySelectedId = null;
+}
+
+function renderGallery() {
+  if (!poseGallery) return;
+
+  ensureGallerySelectionValid();
+  poseGallery.innerHTML = "";
+
+  if (!galleryItems.length) {
+    const empty = document.createElement("div");
+    empty.className = "hint";
+    empty.textContent = "No poses saved yet. Use “Save JSON” or “Save to Gallery”.";
+    poseGallery.appendChild(empty);
+    return;
+  }
+
+  galleryItems.forEach((it, idx) => {
+    const card = document.createElement("div");
+    card.className = "poseItem" + (it.id === gallerySelectedId ? " poseItem--active" : "");
+    card.title = "Click to load this pose";
+
+    const badge = document.createElement("div");
+    badge.className = "poseBadge";
+    badge.textContent = String(idx + 1);
+
+    const img = document.createElement("img");
+    img.className = "poseThumb";
+    img.alt = it.name || "Pose";
+    img.loading = "lazy";
+    img.src = it.thumb;
+
+    const meta = document.createElement("div");
+    meta.className = "poseMeta";
+
+    const name = document.createElement("div");
+    name.className = "poseName";
+    name.textContent = it.name || "Untitled pose";
+
+    const time = document.createElement("div");
+    time.className = "poseTime";
+    time.textContent = niceTime(it.createdAt || "");
+
+    meta.appendChild(name);
+    meta.appendChild(time);
+
+    card.appendChild(img);
+    card.appendChild(badge);
+    card.appendChild(meta);
+
+    card.addEventListener("click", () => {
+      gallerySelectedId = it.id;
+      renderGallery();
+      applyPose(it.pose);
+      if (typeof it.notes === "string") poseNotes.value = it.notes;
+      showToast(`Loaded: ${it.name || "pose"}`);
+    });
+
+    poseGallery.appendChild(card);
+  });
+}
+
+function captureThumbnail(size = 256) {
+  // Must render before capture for accuracy
+  renderer.render(scene, camera);
+
+  // Draw from renderer DOM canvas into a square thumbnail
+  const src = renderer.domElement;
+  const thumb = document.createElement("canvas");
+  thumb.width = size;
+  thumb.height = size;
+
+  const ctx = thumb.getContext("2d", { willReadFrequently: false });
+  if (!ctx) return null;
+
+  // Center-crop to square from source canvas
+  const sw = src.width;
+  const sh = src.height;
+  const s = Math.min(sw, sh);
+  const sx = Math.floor((sw - s) / 2);
+  const sy = Math.floor((sh - s) / 2);
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(src, sx, sy, s, s, 0, 0, size, size);
+
+  try {
+    return thumb.toDataURL("image/png");
+  } catch {
+    return null;
+  }
+}
+
+function savePoseToGallery({ name = "", withToast = true } = {}) {
+  const pose = serializePose();
+  const thumb = captureThumbnail(256);
+
+  if (!thumb) {
+    showToast("Thumbnail capture failed", 1600);
+    return;
+  }
+
+  const item = {
+    id: uid(),
+    name: (name || "").trim() || `Pose ${galleryItems.length + 1}`,
+    createdAt: nowISO(),
+    notes: String(poseNotes.value || ""),
+    pose,
+    thumb
+  };
+
+  galleryItems.unshift(item);
+  if (galleryItems.length > GALLERY.maxItems) galleryItems.length = GALLERY.maxItems;
+
+  gallerySelectedId = item.id;
+  saveGalleryToStorage();
+  renderGallery();
+
+  if (withToast) showToast("Saved to gallery");
+}
+
+function renameSelectedGalleryPose() {
+  if (!gallerySelectedId) {
+    showToast("Select a pose thumbnail first");
+    return;
+  }
+  const it = galleryItems.find(x => x.id === gallerySelectedId);
+  if (!it) return;
+
+  const next = prompt("Rename pose:", it.name || "");
+  if (next === null) return; // cancelled
+  const trimmed = String(next).trim();
+  it.name = trimmed || it.name || "Untitled pose";
+
+  saveGalleryToStorage();
+  renderGallery();
+  showToast("Pose renamed");
+}
+
+function deleteSelectedGalleryPose() {
+  if (!gallerySelectedId) {
+    showToast("Select a pose thumbnail first");
+    return;
+  }
+  const before = galleryItems.length;
+  galleryItems = galleryItems.filter(x => x.id !== gallerySelectedId);
+  gallerySelectedId = null;
+
+  if (galleryItems.length === before) return;
+
+  saveGalleryToStorage();
+  renderGallery();
+  showToast("Pose deleted");
+}
+
+function clearGalleryAll() {
+  if (!galleryItems.length) {
+    showToast("Gallery is already empty");
+    return;
+  }
+  const ok = confirm("Clear ALL saved poses from gallery? (This cannot be undone)");
+  if (!ok) return;
+
+  galleryItems = [];
+  gallerySelectedId = null;
+  saveGalleryToStorage();
+  renderGallery();
+  showToast("Gallery cleared");
+}
 
 /* Scene */
 function createRenderer() {
@@ -481,10 +712,10 @@ function serializePose() {
 
   return {
     version: 1,
-    notes: poseNotes.value || "",
+    notes: String(poseNotes.value || ""),
     joints,
     props,
-    savedAt: new Date().toISOString()
+    savedAt: nowISO()
   };
 }
 
@@ -514,7 +745,8 @@ function applyPose(data) {
     });
   }
 
-  poseNotes.value = data.notes || "";
+  if (typeof data.notes === "string") poseNotes.value = data.notes;
+
   updateOutline();
   showToast("Pose loaded");
 }
@@ -562,6 +794,7 @@ function onPointerDown(ev) {
 }
 
 function onKeyDown(ev) {
+  // modal close stays priority
   if (ev.key === "Escape") {
     if (helpModal && !helpModal.classList.contains("hidden")) {
       helpModal.classList.add("hidden");
@@ -570,9 +803,44 @@ function onKeyDown(ev) {
     }
     clearSelection();
     showToast("Selection cleared");
+    return;
   }
 
-  if (ev.key.toLowerCase() === "f") focusSelection();
+  // shortcuts
+  const k = ev.key.toLowerCase();
+
+  if (k === "f") {
+    focusSelection();
+    return;
+  }
+
+  if (k === "1") {
+    setMode("rotate");
+    return;
+  }
+
+  if (k === "2") {
+    setMode("move");
+    return;
+  }
+
+  if (k === "3") {
+    setMode("orbit");
+    return;
+  }
+
+  // delete prop
+  if (ev.key === "Delete" || ev.key === "Backspace") {
+    if (selected && selected.userData.isProp) deleteSelectedProp();
+    return;
+  }
+
+  // Ctrl+S / Cmd+S -> save to gallery without download
+  if ((ev.ctrlKey || ev.metaKey) && k === "s") {
+    ev.preventDefault();
+    savePoseToGallery({ withToast: true });
+    return;
+  }
 }
 
 /* UI wiring */
@@ -608,14 +876,20 @@ function hookUI() {
   btnResetPose.addEventListener("click", resetPose);
   btnRandomPose.addEventListener("click", randomPose);
 
+  // Save JSON (download) + ALSO save thumbnail to gallery (best UX)
   btnSavePose.addEventListener("click", () => {
     const data = serializePose();
+
+    // download pose.json (unchanged behavior)
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "pose.json";
     a.click();
-    showToast("Saved pose.json");
+
+    // store in gallery too
+    savePoseToGallery({ name: "", withToast: false });
+    showToast("Saved pose.json + gallery");
   });
 
   btnLoadPose.addEventListener("click", () => filePose.click());
@@ -675,6 +949,12 @@ function hookUI() {
     perfEnabled = !perfEnabled;
     showToast(perfEnabled ? "Perf: ON" : "Perf: OFF");
   });
+
+  /* Pose Gallery UI */
+  btnSaveGallery?.addEventListener("click", () => savePoseToGallery({ withToast: true }));
+  btnRenamePose?.addEventListener("click", renameSelectedGalleryPose);
+  btnDeletePose?.addEventListener("click", deleteSelectedGalleryPose);
+  btnClearGallery?.addEventListener("click", clearGalleryAll);
 }
 
 /* Resize (use ResizeObserver for 100% reliability) */
@@ -725,6 +1005,10 @@ try {
   createScene();
   buildCharacter();
   hookUI();
+
+  // Gallery boot
+  loadGalleryFromStorage();
+  renderGallery();
 
   setMode("rotate");
   updateGizmoAxis();
