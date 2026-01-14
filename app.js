@@ -1,17 +1,8 @@
-/* ==========================================================================
-   Pose Sandbox — app.js (ES Modules, no bundler)
-   - Three.js scene, lights, floor, grid
-   - Simple character with joints (groups)
-   - OrbitControls + TransformControls for rotation posing
-   - Props creation + selection
-   - Save/Load JSON pose + Export PNG
-   ========================================================================== */
-
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 
-/* ----------------------------- DOM refs --------------------------------- */
+/* DOM refs */
 const canvas = document.getElementById("c");
 const errorOverlay = document.getElementById("errorOverlay");
 const errorText = document.getElementById("errorText");
@@ -53,7 +44,7 @@ const btnCloseHelp = document.getElementById("btnCloseHelp");
 const btnHelpOk = document.getElementById("btnHelpOk");
 const btnPerf = document.getElementById("btnPerf");
 
-/* ----------------------------- Helpers ---------------------------------- */
+/* Helpers */
 function showToast(msg, ms = 1400) {
   toast.textContent = msg;
   toast.classList.add("show");
@@ -75,20 +66,18 @@ function degToRad(d) {
   return (d * Math.PI) / 180;
 }
 
-/* --------------------------- Three setup -------------------------------- */
-let renderer, scene, camera, orbit, gizmo, axesHelper, gridHelper;
+/* Three globals */
+let renderer, scene, camera, orbit, gizmo, axesHelper, gridHelper, outline;
 let raycaster, pointer;
 
-let selected = null;         // selected Object3D
-let selectedRoot = null;     // root type (joint / prop)
-let outline = null;          // selection outline (BoxHelper)
-
+let selected = null;
 let perfEnabled = false;
+
 let lastFrameTime = performance.now();
 let fpsSmoothed = 60;
 
 const STATE = {
-  mode: "rotate",           // "rotate" | "orbit"
+  mode: "rotate",                 // "rotate" | "orbit"
   axis: { x: true, y: true, z: true },
   snapDeg: 10,
   showGrid: true,
@@ -96,21 +85,35 @@ const STATE = {
   showOutline: true
 };
 
-/* --------------------------- Scene creation ----------------------------- */
+const world = {
+  root: new THREE.Group(),
+  joints: [],
+  props: []
+};
+
+/* Scene */
 function createRenderer() {
   renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: true,
     alpha: false,
     powerPreference: "high-performance",
-    preserveDrawingBuffer: true // needed for Export PNG without flicker
+    preserveDrawingBuffer: true
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
 
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+}
+
+function setBackgroundTone(mode) {
+  if (!scene) return;
+  if (mode === "studio") scene.background = new THREE.Color(0x10131a);
+  else if (mode === "graphite") scene.background = new THREE.Color(0x0b0b10);
+  else scene.background = new THREE.Color(0x0b0f17);
 }
 
 function createScene() {
@@ -131,19 +134,16 @@ function createScene() {
   orbit.dampingFactor = 0.06;
   orbit.target.set(0, 1.05, 0);
 
-  // Lights (pleasant)
   scene.add(new THREE.AmbientLight(0xffffff, 0.45));
 
   const key = new THREE.DirectionalLight(0xffffff, 0.85);
   key.position.set(6, 10, 3);
-  key.castShadow = false;
   scene.add(key);
 
   const fill = new THREE.DirectionalLight(0x88bbff, 0.35);
   fill.position.set(-7, 4, -6);
   scene.add(fill);
 
-  // Floor
   const floorMat = new THREE.MeshStandardMaterial({
     color: 0x131826,
     metalness: 0.05,
@@ -154,7 +154,6 @@ function createScene() {
   floor.position.y = 0;
   scene.add(floor);
 
-  // Grid + axes
   gridHelper = new THREE.GridHelper(50, 50, 0x2a3550, 0x1c2436);
   gridHelper.position.y = 0.001;
   scene.add(gridHelper);
@@ -163,38 +162,30 @@ function createScene() {
   axesHelper.visible = false;
   scene.add(axesHelper);
 
-  // Raycasting
   raycaster = new THREE.Raycaster();
   pointer = new THREE.Vector2();
 
-  // Transform controls (rotate posing)
   gizmo = new TransformControls(camera, renderer.domElement);
   gizmo.setMode("rotate");
   gizmo.setSpace("local");
   gizmo.size = 0.85;
+
   gizmo.addEventListener("dragging-changed", (e) => {
-    orbit.enabled = !e.value && STATE.mode === "orbit";
+    orbit.enabled = !e.value && (STATE.mode === "orbit");
     if (e.value) showToast("Rotating…");
   });
+
   scene.add(gizmo);
 
-  // selection outline
   outline = new THREE.BoxHelper(new THREE.Object3D(), 0x24d2ff);
   outline.visible = false;
   scene.add(outline);
 
-  // Input
   window.addEventListener("pointerdown", onPointerDown);
   window.addEventListener("keydown", onKeyDown);
 }
 
-/* ----------------------- Character + props system ----------------------- */
-const world = {
-  root: new THREE.Group(),
-  joints: [],  // array of joint groups
-  props: []    // array of prop meshes
-};
-
+/* Character */
 function makeMaterial(colorHex) {
   return new THREE.MeshStandardMaterial({
     color: colorHex,
@@ -213,7 +204,10 @@ function namedGroup(name, x = 0, y = 0, z = 0) {
 }
 
 function addBox(parent, name, w, h, d, x, y, z, color = 0xb4b8c8) {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), makeMaterial(color));
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    makeMaterial(color)
+  );
   mesh.name = name;
   mesh.position.set(x, y, z);
   mesh.userData.pickable = true;
@@ -231,7 +225,6 @@ function buildCharacter() {
   const hips = namedGroup("hips", 0, 0.95, 0);
   root.add(hips);
 
-  // torso
   addBox(hips, "torso_mesh", 1.05, 1.35, 0.55, 0, 0.7, 0, 0xaab0c2);
 
   const chest = namedGroup("chest", 0, 1.4, 0);
@@ -242,7 +235,6 @@ function buildCharacter() {
 
   addBox(neck, "head_mesh", 0.6, 0.62, 0.6, 0, 0.45, 0, 0xc3c8d8);
 
-  // left arm
   const lShoulder = namedGroup("l_shoulder", -0.62, 0.35, 0);
   chest.add(lShoulder);
   addBox(lShoulder, "l_upperarm_mesh", 0.28, 0.75, 0.28, 0, -0.38, 0, 0x9aa2b8);
@@ -251,7 +243,6 @@ function buildCharacter() {
   lShoulder.add(lElbow);
   addBox(lElbow, "l_forearm_mesh", 0.25, 0.68, 0.25, 0, -0.34, 0, 0x8c95ab);
 
-  // right arm
   const rShoulder = namedGroup("r_shoulder", 0.62, 0.35, 0);
   chest.add(rShoulder);
   addBox(rShoulder, "r_upperarm_mesh", 0.28, 0.75, 0.28, 0, -0.38, 0, 0x9aa2b8);
@@ -260,7 +251,6 @@ function buildCharacter() {
   rShoulder.add(rElbow);
   addBox(rElbow, "r_forearm_mesh", 0.25, 0.68, 0.25, 0, -0.34, 0, 0x8c95ab);
 
-  // legs
   const lHip = namedGroup("l_hip", -0.30, 0.05, 0);
   hips.add(lHip);
   addBox(lHip, "l_thigh_mesh", 0.35, 0.92, 0.35, 0, -0.46, 0, 0x8792aa);
@@ -277,16 +267,14 @@ function buildCharacter() {
   rHip.add(rKnee);
   addBox(rKnee, "r_shin_mesh", 0.32, 0.82, 0.32, 0, -0.41, 0, 0x7b86a0);
 
-  // slightly lift character above floor
   root.position.y = 0.01;
-
   scene.add(world.root);
 }
 
+/* Props */
 function addProp(type) {
   const base = new THREE.Group();
   base.userData.isProp = true;
-  base.userData.pickable = true;
 
   let mesh;
   if (type === "cube") {
@@ -300,14 +288,10 @@ function addProp(type) {
   mesh.userData.pickable = true;
   base.add(mesh);
 
-  base.position.set(
-    (Math.random() - 0.5) * 2.0,
-    0.28,
-    (Math.random() - 0.5) * 2.0
-  );
-
+  base.position.set((Math.random() - 0.5) * 2.0, 0.28, (Math.random() - 0.5) * 2.0);
   world.props.push(base);
   scene.add(base);
+
   showToast(`Added ${type}`);
 }
 
@@ -322,14 +306,13 @@ function deleteSelectedProp() {
   showToast("Prop deleted");
 }
 
-/* ------------------------------ Selection ------------------------------- */
+/* Selection */
 function pickFromPointer(ev) {
   const rect = canvas.getBoundingClientRect();
   pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
   pointer.y = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);
   raycaster.setFromCamera(pointer, camera);
 
-  // Collect pickables: meshes inside joints + props
   const pickables = [];
 
   world.root.traverse(obj => {
@@ -342,7 +325,6 @@ function pickFromPointer(ev) {
   const hits = raycaster.intersectObjects(pickables, true);
   if (!hits.length) return null;
 
-  // if mesh inside joint, select its parent joint group
   let o = hits[0].object;
   while (o && o.parent) {
     if (o.parent.userData.isJoint) return o.parent;
@@ -354,6 +336,7 @@ function pickFromPointer(ev) {
 
 function setSelection(obj) {
   selected = obj;
+
   if (!selected) {
     selectionName.value = "None";
     gizmo.detach();
@@ -361,9 +344,7 @@ function setSelection(obj) {
     return;
   }
 
-  const name = selected.name || "(unnamed)";
-  selectionName.value = name;
-
+  selectionName.value = selected.name || "(unnamed)";
   gizmo.attach(selected);
   updateGizmoAxis();
   updateOutline();
@@ -401,7 +382,7 @@ function focusSelection() {
   showToast("Focused");
 }
 
-/* ------------------------------ Controls -------------------------------- */
+/* Controls */
 function setMode(mode) {
   STATE.mode = mode;
 
@@ -421,8 +402,6 @@ function toggleAxis(btn, key) {
 }
 
 function updateGizmoAxis() {
-  // TransformControls doesn't directly "lock axes" in rotate mode,
-  // but we can hide axes by setting showX/showY/showZ.
   gizmo.showX = STATE.axis.x;
   gizmo.showY = STATE.axis.y;
   gizmo.showZ = STATE.axis.z;
@@ -432,7 +411,7 @@ function updateGizmoAxis() {
   gizmo.setRotationSnap(snap > 0 ? degToRad(snap) : null);
 }
 
-/* ------------------------------ Pose I/O -------------------------------- */
+/* Pose I/O */
 function serializePose() {
   const joints = {};
   world.joints.forEach(j => {
@@ -458,7 +437,6 @@ function serializePose() {
 function applyPose(data) {
   if (!data || typeof data !== "object") throw new Error("Invalid pose JSON");
 
-  // joints
   if (data.joints) {
     world.joints.forEach(j => {
       const q = data.joints[j.name];
@@ -466,7 +444,6 @@ function applyPose(data) {
     });
   }
 
-  // props: wipe and recreate minimal
   if (Array.isArray(data.props)) {
     world.props.forEach(p => scene.remove(p));
     world.props = [];
@@ -495,7 +472,6 @@ function resetPose() {
 }
 
 function randomPose() {
-  // Mild randomization: shoulders + elbows + head only
   const names = new Set(["l_shoulder","r_shoulder","l_elbow","r_elbow","neck","chest"]);
   world.joints.forEach(j => {
     if (!names.has(j.name)) return;
@@ -507,9 +483,8 @@ function randomPose() {
   showToast("Random pose");
 }
 
-/* ------------------------------ Export PNG ------------------------------ */
+/* Export PNG */
 function exportPNG() {
-  // Ensure one clean render before export
   renderer.render(scene, camera);
   const url = renderer.domElement.toDataURL("image/png");
   const a = document.createElement("a");
@@ -519,20 +494,11 @@ function exportPNG() {
   showToast("Exported PNG");
 }
 
-/* --------------------------- Background tone ---------------------------- */
-function setBackgroundTone(mode) {
-  if (!scene) return;
-  if (mode === "studio") scene.background = new THREE.Color(0x10131a);
-  else if (mode === "graphite") scene.background = new THREE.Color(0x0b0b10);
-  else scene.background = new THREE.Color(0x0b0f17);
-}
-
-/* ------------------------------- Events -------------------------------- */
+/* Events */
 function onPointerDown(ev) {
-  if (STATE.mode !== "rotate") return; // orbit mode uses default behavior
+  if (STATE.mode !== "rotate") return;
+  if (helpModal && !helpModal.classList.contains("hidden")) return;
 
-  // If clicking gizmo itself, ignore (TransformControls handles)
-  // We'll still attempt pick if not dragging.
   const obj = pickFromPointer(ev);
   if (obj) {
     setSelection(obj);
@@ -542,14 +508,19 @@ function onPointerDown(ev) {
 
 function onKeyDown(ev) {
   if (ev.key === "Escape") {
+    if (helpModal && !helpModal.classList.contains("hidden")) {
+      helpModal.classList.add("hidden");
+      showToast("Help closed");
+      return;
+    }
     clearSelection();
     showToast("Selection cleared");
   }
-  if (ev.key.toLowerCase() === "f") {
-    focusSelection();
-  }
+
+  if (ev.key.toLowerCase() === "f") focusSelection();
 }
 
+/* UI wiring */
 function hookUI() {
   btnFocus.addEventListener("click", focusSelection);
   btnClear.addEventListener("click", clearSelection);
@@ -567,10 +538,12 @@ function hookUI() {
     STATE.showGrid = togGrid.checked;
     gridHelper.visible = STATE.showGrid;
   });
+
   togAxes.addEventListener("change", () => {
     STATE.showAxes = togAxes.checked;
     axesHelper.visible = STATE.showAxes;
   });
+
   togOutline.addEventListener("change", () => {
     STATE.showOutline = togOutline.checked;
     updateOutline();
@@ -610,42 +583,75 @@ function hookUI() {
 
   bgTone.addEventListener("change", () => setBackgroundTone(bgTone.value));
 
-// Help modal (OPEN ONLY)
-function openHelp() {
-  helpModal.classList.remove("hidden");
+  /* Help modal — robust close */
+  function openHelp() {
+    helpModal.classList.remove("hidden");
+    showToast("Help opened");
+    btnCloseHelp?.focus?.();
+  }
+
+  function closeHelp() {
+    helpModal.classList.add("hidden");
+    showToast("Help closed");
+  }
+
+  btnHelp.addEventListener("click", (e) => {
+    e.preventDefault();
+    openHelp();
+  });
+
+  btnCloseHelp.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeHelp();
+  });
+
+  btnHelpOk.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeHelp();
+  });
+
+  helpModal.addEventListener("click", (e) => {
+    if (e.target?.dataset?.close === "true") closeHelp();
+  });
+
+  btnPerf.addEventListener("click", () => {
+    perfEnabled = !perfEnabled;
+    showToast(perfEnabled ? "Perf: ON" : "Perf: OFF");
+  });
 }
 
-btnHelp.addEventListener("click", openHelp);
-
-
-/* ------------------------------ Resize --------------------------------- */
-function onResize() {
+/* Resize (use ResizeObserver for 100% reliability) */
+function resizeToCanvas() {
   const w = canvas.clientWidth;
   const h = canvas.clientHeight;
+  if (!w || !h) return;
 
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 
   renderer.setSize(w, h, false);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
   updateOutline();
 }
 
-window.addEventListener("resize", onResize);
+let ro = null;
+function setupResizeObserver() {
+  if (ro) ro.disconnect();
+  ro = new ResizeObserver(() => resizeToCanvas());
+  ro.observe(canvas);
+  window.addEventListener("resize", resizeToCanvas);
+}
 
-/* ------------------------------ Render loop ----------------------------- */
+/* Render loop */
 function tick() {
   requestAnimationFrame(tick);
 
   orbit.update();
   renderer.render(scene, camera);
 
-  if (selected && STATE.showOutline) {
-    outline.setFromObject(selected);
-  }
+  if (selected && STATE.showOutline) outline.setFromObject(selected);
 
-  // tiny perf overlay using toast (not spammy)
   const now = performance.now();
   const dt = now - lastFrameTime;
   lastFrameTime = now;
@@ -657,19 +663,20 @@ function tick() {
   }
 }
 
-/* ------------------------------ Boot ----------------------------------- */
+/* Boot */
 try {
   createRenderer();
   createScene();
   buildCharacter();
   hookUI();
+
   setMode("rotate");
   updateGizmoAxis();
 
-  // ensure initial layout correct
-  onResize();
-  showToast("Ready. Click a joint to pose.");
+  setupResizeObserver();
+  resizeToCanvas();
 
+  showToast("Ready. Click a joint to pose.");
   tick();
 } catch (err) {
   fatal(err);
