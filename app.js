@@ -491,58 +491,58 @@ function buildCharacter() {
   const hips = namedGroup("hips", 0, 0.9, 0);
   root.add(hips);
 
-  /* ===================== TORSO (slightly shorter) ===================== */
+  /* ===================== TORSO (shorter, tighter) ===================== */
   addBox(
     hips,
     "torso_mesh",
-    1.0,      // width ↓
-    1.15,     // height ↓ (was 1.35)
+    1.0,    // width
+    1.15,   // height (shorter)
     0.55,
     0,
-    0.6,      // center ↓
+    0.6,    // center
     0,
     0xaab0c2
   );
 
   /* ===================== CHEST ===================== */
-  const chest = namedGroup("chest", 0, 1.15, 0); // lower chest
+  const chest = namedGroup("chest", 0, 1.15, 0);
   hips.add(chest);
 
-  /* ===================== NECK (lowered) ===================== */
-  const neck = namedGroup("neck", 0, 0.38, 0); // closer to torso
+  /* ===================== NECK (lower & closer) ===================== */
+  const neck = namedGroup("neck", 0, 0.38, 0);
   chest.add(neck);
 
   /* ===================== HEAD (closer & slightly smaller) ===================== */
   addBox(
     neck,
     "head_mesh",
-    0.55,     // slightly smaller
+    0.55,
     0.58,
     0.55,
     0,
-    0.32,     // closer to neck
+    0.32,
     0,
     0xc3c8d8
   );
 
-  /* ===================== SHOULDERS (lower & relaxed) ===================== */
-  const shoulderY = 0.25; // lowered
-  const shoulderX = 0.58; // slightly closer
+  /* ===================== SHOULDERS (lower, relaxed) ===================== */
+  const shoulderY = 0.25;
+  const shoulderX = 0.58;
 
   const lShoulder = namedGroup("l_shoulder", -shoulderX, shoulderY, 0);
   const rShoulder = namedGroup("r_shoulder",  shoulderX, shoulderY, 0);
   chest.add(lShoulder);
   chest.add(rShoulder);
 
-  /* ===================== UPPER ARMS (longer & lower) ===================== */
+  /* ===================== UPPER ARMS ===================== */
   addBox(
     lShoulder,
     "l_upperarm_mesh",
     0.26,
-    0.78,     // longer arm
+    0.78,
     0.26,
     0,
-    -0.45,    // hangs lower
+    -0.45,
     0,
     0x9aa2b8
   );
@@ -628,6 +628,7 @@ function buildCharacter() {
   lHip.add(lKnee);
   rHip.add(rKnee);
 
+  /* ===================== SHINS ===================== */
   addBox(
     lKnee,
     "l_shin_mesh",
@@ -652,10 +653,10 @@ function buildCharacter() {
     0x7b86a0
   );
 
-  /* ===================== FINAL ===================== */
   root.position.y = 0.01;
   scene.add(world.root);
 }
+
 
 
 /* Props */
