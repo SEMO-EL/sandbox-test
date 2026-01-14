@@ -5,6 +5,7 @@
   - ES Modules + Import Map
   - Three.js + OrbitControls + TransformControls
   - UI + Canvas + Help Modal
+  - Pose Gallery (thumbnails) using localStorage (no backend)
 -->
 <head>
   <meta charset="UTF-8" />
@@ -125,15 +126,44 @@
         </div>
 
         <div class="row row--split">
-          <button class="btn btn--primary" id="btnSavePose" type="button" title="Download pose.json">Save JSON</button>
+          <button class="btn btn--primary" id="btnSavePose" type="button" title="Download pose.json AND save thumbnail to gallery">
+            Save JSON
+          </button>
           <button class="btn" id="btnLoadPose" type="button" title="Load pose.json from your computer">Load JSON</button>
           <input id="filePose" type="file" accept=".json" hidden />
+        </div>
+
+        <div class="row">
+          <button class="btn" id="btnSaveGallery" type="button" title="Save pose to gallery (no download)">
+            Save to Gallery
+          </button>
         </div>
 
         <div class="row">
           <label class="label" for="poseNotes">Notes</label>
           <textarea id="poseNotes" class="textarea" rows="3" placeholder="Optional: write pose notes..."></textarea>
         </div>
+      </section>
+
+      <section class="panel__section">
+        <h2 class="panel__title">Pose Gallery</h2>
+
+        <div class="row row--split">
+          <button class="btn" id="btnRenamePose" type="button" title="Rename selected gallery pose">Rename</button>
+          <button class="btn" id="btnDeletePose" type="button" title="Delete selected gallery pose">Delete</button>
+        </div>
+
+        <div class="row">
+          <button class="btn" id="btnClearGallery" type="button" title="Clear all saved gallery poses">
+            Clear Gallery
+          </button>
+        </div>
+
+        <div class="hint">
+          Click a thumbnail to load. Saved locally in your browser (persists after refresh).
+        </div>
+
+        <div id="poseGallery" class="poseGallery" aria-label="Saved pose thumbnails"></div>
       </section>
 
       <section class="panel__section">
@@ -161,7 +191,9 @@
       </section>
 
       <section class="panel__section panel__section--footer">
-        <div class="tiny">Tip: Use <kbd>Esc</kbd> to clear selection. Use <kbd>F</kbd> to focus selection.</div>
+        <div class="tiny">
+          Tip: <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> = Rotate/Move/Orbit • <kbd>Esc</kbd> clears selection • <kbd>F</kbd> focus • <kbd>Del</kbd> deletes prop
+        </div>
         <div class="tiny tiny--muted">Built for GitHub Pages. No bundler. No nonsense.</div>
       </section>
     </aside>
@@ -189,10 +221,11 @@
       <div class="modal__body">
         <ul class="help">
           <li><b>Select:</b> click a joint or prop in the 3D view.</li>
-          <li><b>Rotate:</b> use the gizmo rings. Toggle axes X/Y/Z.</li>
-          <li><b>Move:</b> switch to Move to translate the selected joint/prop.</li>
-          <li><b>Orbit:</b> use Orbit mode to move camera freely.</li>
-          <li><b>Save:</b> downloads a JSON of joint rotations + prop transforms.</li>
+          <li><b>Rotate:</b> use the gizmo rings. Toggle axes X/Y/Z. (<kbd>1</kbd>)</li>
+          <li><b>Move:</b> switch to Move to translate the selected joint/prop. (<kbd>2</kbd>)</li>
+          <li><b>Orbit:</b> use Orbit mode to move camera freely. (<kbd>3</kbd>)</li>
+          <li><b>Save JSON:</b> downloads pose.json AND saves a thumbnail in gallery.</li>
+          <li><b>Save to Gallery:</b> saves locally without downloading.</li>
           <li><b>Export:</b> downloads a PNG of the current view.</li>
         </ul>
         <div class="help__note">
