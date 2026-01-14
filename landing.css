@@ -1,104 +1,54 @@
-body {
+/* LANDING PAGE ONLY — DO NOT SHARE WITH APP */
+
+html, body {
   margin: 0;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: #0b0f17;
-  color: #e6ebff;
+  padding: 0;
 }
 
-section {
-  padding: 80px 8vw;
+body {
+  background: radial-gradient(
+      1200px 600px at 20% -10%,
+      rgba(124, 92, 255, 0.35),
+      transparent 60%
+    ),
+    radial-gradient(
+      900px 500px at 90% 0%,
+      rgba(36, 210, 255, 0.22),
+      transparent 55%
+    ),
+    linear-gradient(180deg, #0b0f17, #0f1625);
+
+  color: #ffffff;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-h1, h2, h3 {
-  margin: 0 0 16px;
-}
-
-p {
-  line-height: 1.6;
-  opacity: 0.9;
-}
-
-.hero {
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 60px;
-  align-items: center;
-  min-height: 90vh;
-}
-
-.hero-actions {
-  margin-top: 28px;
+.landing {
+  min-height: 100vh;
   display: flex;
-  gap: 16px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  text-align: center;
 }
 
-.hero-note {
-  margin-top: 16px;
-  font-size: 14px;
-  opacity: 0.6;
+.landing h1 {
+  font-size: 48px;
+  margin: 0;
 }
 
-.hero-visual img {
-  width: 100%;
-  border-radius: 12px;
-  background: #111;
+.landing p {
+  font-size: 18px;
+  opacity: 0.8;
+  margin: 0;
 }
 
-.btn {
-  padding: 14px 22px;
-  border-radius: 10px;
+.cta {
+  margin-top: 18px;
+  padding: 14px 26px;
+  border-radius: 14px;
   text-decoration: none;
   font-weight: 600;
-  display: inline-block;
-}
-
-.btn.primary {
-  background: #4f6cff;
-  color: white;
-}
-
-.btn.ghost {
-  border: 1px solid #4f6cff;
-  color: #cfd6ff;
-}
-
-.btn.big {
-  padding: 18px 28px;
-  font-size: 18px;
-}
-
-.audience-grid,
-.pricing-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 24px;
-}
-
-.card,
-.price-card {
-  background: #11162a;
-  padding: 28px;
-  border-radius: 14px;
-}
-
-.price-card.featured {
-  outline: 2px solid #4f6cff;
-}
-
-.price {
-  font-size: 32px;
-  margin: 12px 0;
-}
-
-.feature-list {
-  max-width: 600px;
-  margin: auto;
-}
-
-.feature-list li {
-  margin: 12px 0;
-}
-
-.final-cta {
-  text-align: center;
+  color: black;
+  background: linear-gradient(135deg, #7c5cff, #24d2ff);
 }
