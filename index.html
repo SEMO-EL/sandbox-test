@@ -59,7 +59,7 @@
         <h2 class="panel__title">Selection</h2>
         <div class="hint">
           Click a joint or prop in the 3D view.
-          Then use the rotate gizmo.
+          Then use the gizmo.
         </div>
 
         <div class="row">
@@ -75,8 +75,13 @@
 
       <section class="panel__section">
         <h2 class="panel__title">Gizmo</h2>
+
+        <!-- Keep CSS untouched: use 2 rows instead of 3-in-a-row -->
         <div class="row row--split">
           <button class="btn btn--active" id="modeRotate" type="button">Rotate</button>
+          <button class="btn" id="modeMove" type="button">Move</button>
+        </div>
+        <div class="row">
           <button class="btn" id="modeOrbit" type="button">Orbit</button>
         </div>
 
@@ -185,6 +190,7 @@
         <ul class="help">
           <li><b>Select:</b> click a joint or prop in the 3D view.</li>
           <li><b>Rotate:</b> use the gizmo rings. Toggle axes X/Y/Z.</li>
+          <li><b>Move:</b> switch to Move to translate the selected joint/prop.</li>
           <li><b>Orbit:</b> use Orbit mode to move camera freely.</li>
           <li><b>Save:</b> downloads a JSON of joint rotations + prop transforms.</li>
           <li><b>Export:</b> downloads a PNG of the current view.</li>
