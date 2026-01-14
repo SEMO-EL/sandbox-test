@@ -610,43 +610,13 @@ function hookUI() {
 
   bgTone.addEventListener("change", () => setBackgroundTone(bgTone.value));
 
- // Help modal (FIXED)
+// Help modal (OPEN ONLY)
 function openHelp() {
   helpModal.classList.remove("hidden");
 }
 
-function closeHelp() {
-  helpModal.classList.add("hidden");
-}
-
 btnHelp.addEventListener("click", openHelp);
 
-btnCloseHelp.addEventListener("click", (e) => {
-  e.preventDefault();
-  e.stopPropagation();
-  closeHelp();
-});
-
-btnHelpOk.addEventListener("click", (e) => {
-  e.preventDefault();
-  closeHelp();
-});
-
-helpModal.addEventListener("click", (e) => {
-  const clickedBackdrop = e.target?.dataset?.close === "true";
-  const clickedCloseBtn = e.target.closest?.("#btnCloseHelp");
-  const clickedOkBtn = e.target.closest?.("#btnHelpOk");
-
-  if (clickedBackdrop || clickedCloseBtn || clickedOkBtn) {
-    closeHelp();
-  }
-});
-
-window.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !helpModal.classList.contains("hidden")) {
-    closeHelp();
-  }
-});
 
 /* ------------------------------ Resize --------------------------------- */
 function onResize() {
