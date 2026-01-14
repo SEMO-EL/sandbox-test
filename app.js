@@ -509,7 +509,7 @@ function buildCharacter() {
   hips.add(chest);
 
   /* ===================== NECK (lower & closer) ===================== */
-  const neck = namedGroup("neck", 0, 0.38, 0);
+  const neck = namedGroup("neck", 0, 0.1, 0);
   chest.add(neck);
 
   /* ===================== HEAD (closer & slightly smaller) ===================== */
@@ -526,8 +526,8 @@ function buildCharacter() {
   );
 
   /* ===================== SHOULDERS (lower, relaxed) ===================== */
-  const shoulderY = 0.25;
-  const shoulderX = 0.58;
+  const shoulderY = 0.05;
+  const shoulderX = 0.68;
 
   const lShoulder = namedGroup("l_shoulder", -shoulderX, shoulderY, 0);
   const rShoulder = namedGroup("r_shoulder",  shoulderX, shoulderY, 0);
@@ -653,7 +653,7 @@ function buildCharacter() {
     0x7b86a0
   );
 
-  root.position.y = 0.01;
+  root.position.y = 1;
   scene.add(world.root);
 }
 
