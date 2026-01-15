@@ -1,161 +1,581 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pose Sandbox – Free 3D Pose Tool</title>
+<!--
+  PoseSandbox — Landing Page (GitHub Pages friendly)
+  =================================================
+  PURPOSE:
+    - This file is the landing page ("/") users see first.
+    - It links to your actual app at: ./app.html
 
-  <!-- Landing page CSS ONLY -->
+  IMPORTANT:
+    - Keep your app UI isolated in app.html + styles.css + app.js
+    - Keep the landing UI isolated in index.html + landing.css
+
+  SEO / SHARE / DISCOVERY INCLUDED:
+    - Meta description + canonical + robots
+    - Open Graph (Discord / FB) + Twitter cards
+    - JSON-LD structured data (SoftwareApplication)
+    - Web App Manifest hook (optional)
+    - Favicons (SVG + fallback)
+    - Preconnect + performance hints
+-->
+<head>
+  <!-- =========================
+       BASIC META / PERFORMANCE
+       ========================= -->
+  <meta charset="utf-8" />
+  <meta http-equiv="x-ua-compatible" content="ie=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Theme / UI -->
+  <meta name="theme-color" content="#0b0f17" />
+  <meta name="color-scheme" content="dark light" />
+
+  <!-- Title -->
+  <title>PoseSandbox — 3D Pose Reference Tool for Artists (Free, In-Browser)</title>
+
+  <!-- Description (SEO) -->
+  <meta
+    name="description"
+    content="PoseSandbox is a free, fast 3D pose reference tool for artists. Pose a mannequin, add props, save & load poses, and export PNG references — right in your browser."
+  />
+
+  <!-- Keywords (minor SEO; safe) -->
+  <meta
+    name="keywords"
+    content="PoseSandbox, pose reference, 3d pose tool, mannequin poser, drawing reference, anatomy reference, artist tool, character posing, gesture drawing, pose generator, 3d mannequin, reference images"
+  />
+
+  <!-- Indexing rules -->
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
+  <meta name="googlebot" content="index,follow" />
+  <meta name="bingbot" content="index,follow" />
+
+  <!-- Canonical (IMPORTANT: match your GitHub Pages URL) -->
+  <link rel="canonical" href="https://semo-el.github.io/sandbox-test/" />
+
+  <!-- OPTIONAL: verification placeholders (only if you use Search Console / Bing Webmaster)
+  <meta name="google-site-verification" content="PASTE_TOKEN_HERE" />
+  <meta name="msvalidate.01" content="PASTE_TOKEN_HERE" />
+  -->
+
+  <!-- =========================
+       SOCIAL SHARE (OPEN GRAPH)
+       ========================= -->
+  <meta property="og:site_name" content="PoseSandbox" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="PoseSandbox — 3D Pose Reference Tool for Artists" />
+  <meta
+    property="og:description"
+    content="Pose a 3D mannequin, add props, save & load poses, export PNG references — instantly in your browser."
+  />
+  <meta property="og:url" content="https://semo-el.github.io/sandbox-test/" />
+
+  <!-- OG image: put a real image at /assets/og.png (recommended 1200x630).
+       For now, we point to an SVG placeholder you can keep or replace. -->
+  <meta property="og:image" content="https://semo-el.github.io/sandbox-test/assets/og.svg" />
+  <meta property="og:image:alt" content="PoseSandbox — 3D Pose Reference Tool for Artists" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="PoseSandbox — 3D Pose Reference Tool for Artists" />
+  <meta
+    name="twitter:description"
+    content="Pose a mannequin, add props, save & load poses, export PNG references — free and in-browser."
+  />
+  <meta name="twitter:image" content="https://semo-el.github.io/sandbox-test/assets/og.svg" />
+
+  <!-- =========================
+       ICONS / MANIFEST
+       ========================= -->
+  <!-- Primary icon (SVG) -->
+  <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml" />
+
+  <!-- Fallback (optional): add a PNG if you want -->
+  <!-- <link rel="icon" href="./assets/favicon.png" type="image/png" /> -->
+
+  <!-- Apple touch icon (optional): add your PNG later -->
+  <!-- <link rel="apple-touch-icon" href="./assets/apple-touch-icon.png" /> -->
+
+  <!-- Manifest (optional): keeps everything working, doesn't affect app -->
+  <link rel="manifest" href="./site.webmanifest" />
+
+  <!-- =========================
+       FONTS (SAFE + FAST)
+       ========================= -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- Inter font -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- =========================
+       STYLES (Landing only)
+       ========================= -->
   <link rel="stylesheet" href="./landing.css" />
 
-  <!-- Basic SEO -->
-  <meta name="description" content="Free 3D pose reference tool for artists, animators, and game developers. Create, save, and export poses instantly." />
+  <!-- =========================
+       STRUCTURED DATA (JSON-LD)
+       ========================= -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "PoseSandbox",
+    "applicationCategory": "DesignApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "description": "PoseSandbox is a free, in-browser 3D pose reference tool for artists. Pose a mannequin, add props, save & load poses, and export PNG references instantly.",
+    "url": "https://semo-el.github.io/sandbox-test/",
+    "image": "https://semo-el.github.io/sandbox-test/assets/og.svg",
+    "author": {
+      "@type": "Person",
+      "name": "SEMO-EL"
+    }
+  }
+  </script>
 </head>
-<body>
 
-  <!-- ===================== NAV ===================== -->
-  <header class="nav">
-    <div class="nav-inner">
-      <div class="logo">PoseSandbox</div>
-      <nav class="nav-links">
-        <a href="#features">Features</a>
-        <a href="#packs">Pose Packs</a>
-        <a href="#pro">Pro</a>
-        <a class="btn-primary small" href="app.html">Launch App</a>
-      </nav>
+<body class="landing">
+  <!-- =========================
+       Skip link (accessibility)
+       ========================= -->
+  <a class="landing__skip" href="#main">Skip to content</a>
+
+  <!-- =========================
+       Top Navigation
+       ========================= -->
+  <header class="landing__topbar" role="banner">
+    <div class="landing__brand">
+      <a class="landing__brandLink" href="./" aria-label="PoseSandbox Home">
+        <span class="landing__logo" aria-hidden="true">◼</span>
+        <span class="landing__brandText">
+          <span class="landing__brandTitle">PoseSandbox</span>
+          <span class="landing__brandTag">3D pose reference • props • export</span>
+        </span>
+      </a>
+    </div>
+
+    <nav class="landing__nav" aria-label="Primary">
+      <a class="landing__navLink" href="#features">Features</a>
+      <a class="landing__navLink" href="#usecases">Use cases</a>
+      <a class="landing__navLink" href="#pricing">Monetization</a>
+      <a class="landing__navLink" href="#faq">FAQ</a>
+    </nav>
+
+    <div class="landing__actions">
+      <a class="landing__btn landing__btn--ghost" href="./app.html" aria-label="Open PoseSandbox App">
+        Open App
+      </a>
+      <a class="landing__btn landing__btn--primary" href="./app.html#start" aria-label="Start posing in PoseSandbox">
+        Start Posing
+      </a>
     </div>
   </header>
 
-  <!-- ===================== HERO ===================== -->
-  <section class="hero">
-    <div class="hero-content">
-      <h1>
-        A Free 3D Pose Tool<br />
-        <span>Built for Artists</span>
-      </h1>
-      <p>
-        Quickly pose a 3D mannequin, rotate joints, save poses,  
-        and export references for drawing, animation, or game design.
-      </p>
-      <div class="hero-buttons">
-        <a href="app.html" class="btn-primary large">Launch the App</a>
-        <a href="#features" class="btn-secondary large">See Features</a>
-      </div>
-    </div>
+  <!-- =========================
+       Hero Section
+       ========================= -->
+  <main class="landing__main" id="main">
+    <section class="landing__hero" aria-label="Hero">
+      <div class="landing__heroGrid">
+        <div class="landing__heroText">
+          <p class="landing__eyebrow">POSESANDBOX</p>
 
-    <div class="hero-visual">
-      <div class="fake-preview">
-        <span>3D Pose Preview</span>
-      </div>
-    </div>
-  </section>
+          <h1 class="landing__headline">
+            The fast, free <span class="landing__grad">3D pose reference</span> tool for artists.
+          </h1>
 
-  <!-- ===================== FEATURES ===================== -->
-  <section id="features" class="section">
-    <h2>What You Can Do</h2>
-    <div class="features-grid">
-      <div class="feature-card">
-        <h3>Pose in 3D</h3>
-        <p>Select joints, rotate or move them, and create realistic poses in seconds.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Save & Load</h3>
-        <p>Save poses as JSON files or keep them in your local pose gallery.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Export Images</h3>
-        <p>Export clean PNG references for drawing or animation planning.</p>
-      </div>
-      <div class="feature-card">
-        <h3>No Account</h3>
-        <p>Everything runs locally in your browser. No signup required.</p>
-      </div>
-    </div>
-  </section>
+          <p class="landing__subhead">
+            Pose a mannequin, add props, save & load poses, and export PNG references — all in your browser.
+            No signup. No install. Just open and pose.
+          </p>
 
-  <!-- ===================== POSE PACKS ===================== -->
-  <section id="packs" class="section alt">
-    <h2>Pose Packs</h2>
-    <p class="section-sub">
-      Download ready-made pose collections to speed up your workflow.
-    </p>
+          <div class="landing__ctaRow">
+            <a class="landing__btn landing__btn--primary landing__btn--big" href="./app.html">
+              Launch PoseSandbox
+            </a>
+            <a class="landing__btn landing__btn--ghost landing__btn--big" href="#features">
+              See Features
+            </a>
+          </div>
 
-    <div class="packs-grid">
-      <div class="pack-card">
-        <h3>Starter Pack</h3>
-        <ul>
-          <li>Standing poses</li>
-          <li>Basic movement</li>
-          <li>Neutral references</li>
-        </ul>
-        <div class="pack-footer">
-          <span class="price">Free / $5</span>
-          <button disabled class="btn-disabled">Coming Soon</button>
+          <div class="landing__metaRow">
+            <div class="landing__pill">✅ Works on GitHub Pages</div>
+            <div class="landing__pill">✅ Export PNG references</div>
+            <div class="landing__pill">✅ Save/load poses</div>
+            <div class="landing__pill">✅ Props + gallery</div>
+          </div>
+
+          <div class="landing__note">
+            Tip: Share your link anywhere — PoseSandbox is designed to load fast and work instantly.
+          </div>
+        </div>
+
+        <div class="landing__heroCard" aria-label="Preview card">
+          <div class="landing__heroCardTop">
+            <div class="landing__fakeWindowDots" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
+            <div class="landing__fakeWindowTitle">PoseSandbox — Live Preview</div>
+          </div>
+
+          <div class="landing__heroCardBody">
+            <!-- Decorative mannequin preview (CSS-only) -->
+            <div class="landing__mannequin" aria-hidden="true">
+              <div class="m__shadow"></div>
+              <div class="m__torso"></div>
+              <div class="m__head"></div>
+              <div class="m__arm m__arm--l"></div>
+              <div class="m__arm m__arm--r"></div>
+              <div class="m__leg m__leg--l"></div>
+              <div class="m__leg m__leg--r"></div>
+              <div class="m__prop"></div>
+            </div>
+
+            <div class="landing__heroStatGrid">
+              <div class="landing__stat">
+                <div class="landing__statK">Save & Load</div>
+                <div class="landing__statV">Pose JSON + Gallery</div>
+              </div>
+              <div class="landing__stat">
+                <div class="landing__statK">Export</div>
+                <div class="landing__statV">PNG Reference</div>
+              </div>
+              <div class="landing__stat">
+                <div class="landing__statK">Controls</div>
+                <div class="landing__statV">Rotate / Move / Orbit</div>
+              </div>
+              <div class="landing__stat">
+                <div class="landing__statK">Props</div>
+                <div class="landing__statV">Cubes + Spheres</div>
+              </div>
+            </div>
+
+            <div class="landing__heroCardCtas">
+              <a class="landing__btn landing__btn--primary landing__btn--wide" href="./app.html">
+                Open the app now
+              </a>
+              <a class="landing__btn landing__btn--ghost landing__btn--wide" href="#pricing">
+                How to monetize
+              </a>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="pack-card highlight">
-        <h3>Action Pack</h3>
-        <ul>
-          <li>Dynamic motion</li>
-          <li>Combat & jumps</li>
-          <li>Extreme angles</li>
-        </ul>
-        <div class="pack-footer">
-          <span class="price">$9</span>
-          <button disabled class="btn-disabled">Coming Soon</button>
+      <!-- subtle divider -->
+      <div class="landing__divider" aria-hidden="true"></div>
+    </section>
+
+    <!-- =========================
+         Feature Section
+         ========================= -->
+    <section class="landing__section" id="features" aria-label="Features">
+      <div class="landing__sectionHead">
+        <h2 class="landing__h2">Everything you need to generate references quickly</h2>
+        <p class="landing__p">
+          PoseSandbox focuses on speed, clarity, and reliability — the things that actually matter for artists.
+        </p>
+      </div>
+
+      <div class="landing__cards">
+        <article class="landing__card">
+          <h3 class="landing__h3">Pose joints + props</h3>
+          <p class="landing__pSmall">
+            Click a joint or prop and pose it with the gizmo. Use Rotate and Move modes to get exact silhouettes.
+          </p>
+          <ul class="landing__list">
+            <li>Joint selection + outline</li>
+            <li>Rotate snap + axis lock</li>
+            <li>Move translations</li>
+          </ul>
+        </article>
+
+        <article class="landing__card">
+          <h3 class="landing__h3">Save / Load (JSON)</h3>
+          <p class="landing__pSmall">
+            Download pose.json files and load them later. Great for tutorials, commissions, and consistent characters.
+          </p>
+          <ul class="landing__list">
+            <li>Pose notes</li>
+            <li>Props stored with transforms</li>
+            <li>Works offline after cache</li>
+          </ul>
+        </article>
+
+        <article class="landing__card">
+          <h3 class="landing__h3">Pose Gallery</h3>
+          <p class="landing__pSmall">
+            Save thumbnails directly in your browser. Click any thumbnail to instantly reload that pose.
+          </p>
+          <ul class="landing__list">
+            <li>LocalStorage persistence</li>
+            <li>Rename / delete / clear</li>
+            <li>Instant re-open after refresh</li>
+          </ul>
+        </article>
+
+        <article class="landing__card">
+          <h3 class="landing__h3">Export PNG reference</h3>
+          <p class="landing__pSmall">
+            Export clean PNG images for your drawing workflow. Perfect for gesture practice and storyboard frames.
+          </p>
+          <ul class="landing__list">
+            <li>One-click export</li>
+            <li>Consistent lighting</li>
+            <li>Shadows for depth</li>
+          </ul>
+        </article>
+
+        <article class="landing__card">
+          <h3 class="landing__h3">Fast + simple</h3>
+          <p class="landing__pSmall">
+            No backend required. PoseSandbox runs entirely on GitHub Pages, so it’s cheap, stable, and scalable.
+          </p>
+          <ul class="landing__list">
+            <li>No accounts required</li>
+            <li>No build tools</li>
+            <li>Instant load</li>
+          </ul>
+        </article>
+
+        <article class="landing__card">
+          <h3 class="landing__h3">Artist-first UX</h3>
+          <p class="landing__pSmall">
+            Clear UI, minimal distractions, strong contrast, and keyboard shortcuts for speed.
+          </p>
+          <ul class="landing__list">
+            <li>1/2/3 mode keys</li>
+            <li>F to focus, Esc to clear</li>
+            <li>Del deletes props</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- =========================
+         Use Cases
+         ========================= -->
+    <section class="landing__section" id="usecases" aria-label="Use cases">
+      <div class="landing__sectionHead">
+        <h2 class="landing__h2">Built for creators</h2>
+        <p class="landing__p">
+          PoseSandbox helps you move from “idea” to “reference” immediately.
+        </p>
+      </div>
+
+      <div class="landing__split">
+        <div class="landing__panel">
+          <h3 class="landing__h3">For illustrators</h3>
+          <p class="landing__pSmall">
+            Find readable silhouettes and consistent proportions. Export PNG and draw on top.
+          </p>
+          <div class="landing__bullets">
+            <div class="landing__bullet">• Gesture drawing warmups</div>
+            <div class="landing__bullet">• Composition studies</div>
+            <div class="landing__bullet">• Character consistency</div>
+            <div class="landing__bullet">• Quick lighting checks</div>
+          </div>
+        </div>
+
+        <div class="landing__panel">
+          <h3 class="landing__h3">For animators & storyboard artists</h3>
+          <p class="landing__pSmall">
+            Rapid blocking of poses and camera angles. Save sets of poses in the gallery for sequences.
+          </p>
+          <div class="landing__bullets">
+            <div class="landing__bullet">• Keyframe thumbnails</div>
+            <div class="landing__bullet">• Acting beats</div>
+            <div class="landing__bullet">• Shot planning</div>
+            <div class="landing__bullet">• Scene continuity</div>
+          </div>
         </div>
       </div>
+    </section>
 
-      <div class="pack-card">
-        <h3>Cinematic Pack</h3>
-        <ul>
-          <li>Storytelling poses</li>
-          <li>Silhouettes</li>
-          <li>Camera-ready</li>
-        </ul>
-        <div class="pack-footer">
-          <span class="price">$12</span>
-          <button disabled class="btn-disabled">Coming Soon</button>
+    <!-- =========================
+         Monetization (Clear + honest)
+         ========================= -->
+    <section class="landing__section" id="pricing" aria-label="Monetization">
+      <div class="landing__sectionHead">
+        <h2 class="landing__h2">Monetization paths for PoseSandbox</h2>
+        <p class="landing__p">
+          The landing page is optimized for conversion: clear value → instant use → upsell later.
+        </p>
+      </div>
+
+      <div class="landing__pricingGrid">
+        <article class="landing__priceCard landing__priceCard--free">
+          <div class="landing__priceTop">
+            <h3 class="landing__h3">Free</h3>
+            <div class="landing__price">$0</div>
+          </div>
+          <p class="landing__pSmall">
+            The base tool stays free to drive traffic, backlinks, and brand awareness.
+          </p>
+          <ul class="landing__list">
+            <li>Pose joints + props</li>
+            <li>Save/Load JSON</li>
+            <li>Gallery thumbnails</li>
+            <li>Export PNG</li>
+          </ul>
+          <a class="landing__btn landing__btn--ghost landing__btn--wide" href="./app.html">
+            Use Free Version
+          </a>
+          <div class="landing__micro">
+            Conversion strategy: free utility → trust → premium value.
+          </div>
+        </article>
+
+        <article class="landing__priceCard landing__priceCard--pro">
+          <div class="landing__priceTop">
+            <h3 class="landing__h3">Pro (future)</h3>
+            <div class="landing__price">$$</div>
+          </div>
+          <p class="landing__pSmall">
+            Add premium features without breaking the free tool.
+          </p>
+          <ul class="landing__list">
+            <li>More body types (male/female/child)</li>
+            <li>Hand pose presets</li>
+            <li>Pose packs + curated galleries</li>
+            <li>Higher-res export + transparent bg</li>
+          </ul>
+          <a class="landing__btn landing__btn--primary landing__btn--wide" href="#faq">
+            Learn the Plan
+          </a>
+          <div class="landing__micro">
+            Monetize on Gumroad / Patreon / one-time unlocks.
+          </div>
+        </article>
+
+        <article class="landing__priceCard landing__priceCard--studio">
+          <div class="landing__priceTop">
+            <h3 class="landing__h3">Studio License (future)</h3>
+            <div class="landing__price">$$$</div>
+          </div>
+          <p class="landing__pSmall">
+            Sell commercial usage rights for teams, education, and content creators.
+          </p>
+          <ul class="landing__list">
+            <li>Commercial redistribution</li>
+            <li>Custom branding</li>
+            <li>Offline bundle option</li>
+            <li>Priority features</li>
+          </ul>
+          <a class="landing__btn landing__btn--ghost landing__btn--wide" href="./app.html">
+            Start With Free
+          </a>
+          <div class="landing__micro">
+            Higher-ticket revenue once traffic exists.
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- =========================
+         FAQ
+         ========================= -->
+    <section class="landing__section" id="faq" aria-label="FAQ">
+      <div class="landing__sectionHead">
+        <h2 class="landing__h2">FAQ</h2>
+        <p class="landing__p">
+          Keep this simple. You’re removing friction so people actually click “Launch”.
+        </p>
+      </div>
+
+      <div class="landing__faq">
+        <details class="landing__faqItem" open>
+          <summary class="landing__faqQ">Is PoseSandbox really free?</summary>
+          <div class="landing__faqA">
+            Yes. The core web tool is free. The monetization plan is to add optional Pro content later,
+            without breaking the free experience.
+          </div>
+        </details>
+
+        <details class="landing__faqItem">
+          <summary class="landing__faqQ">Do I need an account?</summary>
+          <div class="landing__faqA">
+            No. PoseSandbox runs entirely in your browser. Saved gallery poses stay on your device.
+          </div>
+        </details>
+
+        <details class="landing__faqItem">
+          <summary class="landing__faqQ">Does this work on GitHub Pages?</summary>
+          <div class="landing__faqA">
+            Yes. That’s why PoseSandbox is built with pure HTML/CSS/JS + import maps.
+          </div>
+        </details>
+
+        <details class="landing__faqItem">
+          <summary class="landing__faqQ">How do people discover PoseSandbox?</summary>
+          <div class="landing__faqA">
+            SEO + social previews + content + community links. This landing page includes metadata for Google,
+            Discord, Twitter, and a sitemap/robots setup you’ll add as files.
+          </div>
+        </details>
+      </div>
+
+      <div class="landing__finalCta">
+        <div class="landing__finalCtaInner">
+          <h3 class="landing__h3">Ready to pose?</h3>
+          <p class="landing__pSmall">
+            Launch PoseSandbox and start exporting clean references in minutes.
+          </p>
+          <div class="landing__ctaRow">
+            <a class="landing__btn landing__btn--primary landing__btn--big" href="./app.html">Launch PoseSandbox</a>
+            <a class="landing__btn landing__btn--ghost landing__btn--big" href="./app.html#gallery">Open Gallery</a>
+          </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- ===================== PRO ===================== -->
-  <section id="pro" class="section">
-    <h2>PoseSandbox Pro</h2>
-    <p class="section-sub">
-      Advanced tools for professionals (coming later).
-    </p>
+    <!-- =========================
+         Footer
+         ========================= -->
+    <footer class="landing__footer" role="contentinfo">
+      <div class="landing__footerGrid">
+        <div class="landing__footBrand">
+          <div class="landing__footLogo" aria-hidden="true">◼</div>
+          <div class="landing__footText">
+            <div class="landing__footTitle">PoseSandbox</div>
+            <div class="landing__footSub">Free in-browser 3D pose reference tool for artists.</div>
+          </div>
+        </div>
 
-    <div class="pro-grid">
-      <div class="pro-card">
-        <h3>Unlimited Pose Library</h3>
-        <p>Organize and manage large pose collections.</p>
+        <div class="landing__footLinks">
+          <a class="landing__footLink" href="./app.html">Open App</a>
+          <a class="landing__footLink" href="#features">Features</a>
+          <a class="landing__footLink" href="#pricing">Monetization</a>
+          <a class="landing__footLink" href="#faq">FAQ</a>
+        </div>
+
+        <div class="landing__footLegal">
+          <div class="landing__micro">
+            © <span id="psYear">2026</span> PoseSandbox. Built for GitHub Pages.
+          </div>
+          <div class="landing__micro landing__micro--muted">
+            Tip: Replace <code>assets/og.svg</code> with a real <code>assets/og.png</code> later.
+          </div>
+        </div>
       </div>
-      <div class="pro-card">
-        <h3>Better Models</h3>
-        <p>More body types and proportions.</p>
-      </div>
-      <div class="pro-card">
-        <h3>Commercial License</h3>
-        <p>Use poses freely in professional projects.</p>
-      </div>
-    </div>
-  </section>
+    </footer>
+  </main>
 
-  <!-- ===================== CTA ===================== -->
-  <section class="cta">
-    <h2>Start Posing Now</h2>
-    <p>No signup. No install. Just launch and create.</p>
-    <a href="app.html" class="btn-primary large">Open the App</a>
-  </section>
-
-  <!-- ===================== FOOTER ===================== -->
-  <footer class="footer">
-    <p>© 2026 PoseSandbox. Built for artists.</p>
-  </footer>
-
+  <!-- Tiny script only for year; no dependencies -->
+  <script>
+    (function () {
+      var el = document.getElementById("psYear");
+      if (el) el.textContent = String(new Date().getFullYear());
+    })();
+  </script>
 </body>
 </html>
