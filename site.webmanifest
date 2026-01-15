@@ -1,0 +1,17 @@
+{
+  "name": "PoseSandbox",
+  "short_name": "PoseSandbox",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b0f17",
+  "theme_color": "#0b0f17",
+  "description": "PoseSandbox — free in-browser 3D pose reference tool for artists.",
+  "icons": [
+    {
+      "src": "./assets/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
