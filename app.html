@@ -6,6 +6,7 @@
   - Three.js + OrbitControls + TransformControls
   - UI + Canvas + Help Modal
   - Pose Gallery (thumbnails) using localStorage (no backend)
+  - Preset Poses (built-in, no backend)
 -->
 <head>
   <meta charset="UTF-8" />
@@ -145,6 +146,27 @@
         <div class="row">
           <label class="label" for="poseNotes">Notes</label>
           <textarea id="poseNotes" class="textarea" rows="3" placeholder="Optional: write pose notes..."></textarea>
+        </div>
+      </section>
+
+      <!-- ✅ NEW: Preset Poses -->
+      <section class="panel__section">
+        <h2 class="panel__title">Preset Poses</h2>
+        <div class="hint">
+          Built-in starter poses. Select one, then apply it. (Joints only — your props won’t be deleted.)
+        </div>
+
+        <div class="row">
+          <div id="presetGallery" class="poseGallery" aria-label="Preset pose list"></div>
+        </div>
+
+        <div class="row row--split">
+          <button class="btn" id="btnPresetApply" type="button" title="Apply selected preset (joints only)">
+            Apply Preset
+          </button>
+          <button class="btn" id="btnPresetSave" type="button" title="Save selected preset into your Gallery (creates a thumbnail)">
+            Save to Gallery
+          </button>
         </div>
       </section>
 
