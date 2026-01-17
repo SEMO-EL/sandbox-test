@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { TransformControls } from "three/addons/controls/TransformControls.js";
 
-/* DOM refs */
+/* DOM  refs */
 const canvas = document.getElementById("c");
 const errorOverlay = document.getElementById("errorOverlay");
 const errorText = document.getElementById("errorText");
