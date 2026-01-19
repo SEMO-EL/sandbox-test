@@ -1,4 +1,4 @@
-// controls/Inputs.js
+// controls/InputManager.js
 // Centralizes pointer + keyboard input, and emits events.
 // This file is NEW and does NOT duplicate your other files.
 
@@ -20,18 +20,22 @@ export class InputManager {
       pointerdown: [],
       pointermove: [],
       pointerup: [],
+      pointercancel: [],
       keydown: [],
       keyup: [],
-      resize: []
+      resize: [],
+      blur: []
     };
 
     this._bound = {
       pointerdown: (e) => this._onPointerDown(e),
       pointermove: (e) => this._onPointerMove(e),
       pointerup: (e) => this._onPointerUp(e),
+      pointercancel: (e) => this._onPointerCancel(e),
       keydown: (e) => this._onKeyDown(e),
       keyup: (e) => this._onKeyUp(e),
-      resize: () => this._emit("resize", { type: "resize" })
+      resize: () => this._emit("resize", { type: "resize" }),
+      blur: () => this._onBlur()
     };
 
     // state
@@ -49,15 +53,17 @@ export class InputManager {
     this.canvas.addEventListener("pointerdown", this._bound.pointerdown, { passive: true });
     this.canvas.addEventListener("pointermove", this._bound.pointermove, { passive: true });
     this.canvas.addEventListener("pointerup", this._bound.pointerup, { passive: true });
+    this.canvas.addEventListener("pointercancel", this._bound.pointercancel, { passive: true });
 
     this.win.addEventListener("keydown", this._bound.keydown);
     this.win.addEventListener("keyup", this._bound.keyup);
     this.win.addEventListener("resize", this._bound.resize);
+    this.win.addEventListener("blur", this._bound.blur);
   }
 
   /**
    * Subscribe to an event.
-   * @param {"pointerdown"|"pointermove"|"pointerup"|"keydown"|"keyup"|"resize"} type
+   * @param {"pointerdown"|"pointermove"|"pointerup"|"pointercancel"|"keydown"|"keyup"|"resize"|"blur"} type
    * @param {(evt:any)=>void} fn
    */
   on(type, fn) {
@@ -83,10 +89,12 @@ export class InputManager {
     this.canvas.removeEventListener("pointerdown", this._bound.pointerdown);
     this.canvas.removeEventListener("pointermove", this._bound.pointermove);
     this.canvas.removeEventListener("pointerup", this._bound.pointerup);
+    this.canvas.removeEventListener("pointercancel", this._bound.pointercancel);
 
     this.win.removeEventListener("keydown", this._bound.keydown);
     this.win.removeEventListener("keyup", this._bound.keyup);
     this.win.removeEventListener("resize", this._bound.resize);
+    this.win.removeEventListener("blur", this._bound.blur);
 
     Object.keys(this._handlers).forEach(k => (this._handlers[k] = []));
     this.keys.clear();
@@ -160,8 +168,22 @@ export class InputManager {
   }
 
   /** @private */
+  _onPointerCancel(e) {
+    this.pointer.clientX = e.clientX;
+    this.pointer.clientY = e.clientY;
+    this.pointer.isDown = false;
+
+    this._emit("pointercancel", {
+      type: "pointercancel",
+      originalEvent: e,
+      clientX: e.clientX,
+      clientY: e.clientY,
+      pointerId: e.pointerId
+    });
+  }
+
+  /** @private */
   _onKeyDown(e) {
-    // keep Escape always deliverable (even when help is open)
     const k = String(e.key || "");
     const keyLower = k.toLowerCase();
 
@@ -199,5 +221,14 @@ export class InputManager {
       shiftKey: !!e.shiftKey,
       altKey: !!e.altKey
     });
+  }
+
+  /** @private */
+  _onBlur() {
+    // When the window loses focus, we should clear the pressed keys
+    this.pointer.isDown = false;
+    this.pointer.pointerId = null;
+    this.keys.clear();
+    this._emit("blur", { type: "blur" });
   }
 }
