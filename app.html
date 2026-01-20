@@ -1,3 +1,4 @@
+<!-- app.html -->
 <!DOCTYPE html>
 <html lang="en">
 <!--
@@ -83,11 +84,14 @@
         <h2 class="panel__title">Gizmo</h2>
 
         <div class="row row--split">
-          <button class="btn btn--active" id="modeRotate" type="button">Rotate</button>
-          <button class="btn" id="modeMove" type="button">Move</button>
+          <button class="btn btn--active" id="modeRotate" type="button" title="Shortcut: 1">Rotate</button>
+          <button class="btn" id="modeMove" type="button" title="Shortcut: 2">Move</button>
         </div>
-        <div class="row">
-          <button class="btn" id="modeOrbit" type="button">Orbit</button>
+
+        <div class="row row--split">
+          <button class="btn" id="modeOrbit" type="button" title="Shortcut: 3">Orbit</button>
+          <!-- ✅ NEW (Scale mode button) -->
+          <button class="btn" id="modeScale" type="button" title="Shortcut: 4">Scale</button>
         </div>
 
         <div class="row">
@@ -149,7 +153,7 @@
         </div>
       </section>
 
-      <!-- ✅ NEW: Preset Poses -->
+      <!-- Preset Poses -->
       <section class="panel__section">
         <h2 class="panel__title">Preset Poses</h2>
         <div class="hint">
@@ -195,13 +199,11 @@
         <h2 class="panel__title">Props</h2>
         <div class="hint">Basic decorations you can pose too.</div>
 
-        <!-- Existing buttons kept -->
         <div class="row row--split">
           <button class="btn" id="btnAddCube" type="button">Add Cube</button>
           <button class="btn" id="btnAddSphere" type="button">Add Sphere</button>
         </div>
 
-        <!-- New prop buttons (additive, no removals) -->
         <div class="row row--split">
           <button class="btn" id="btnAddCylinder" type="button">Add Cylinder</button>
           <button class="btn" id="btnAddCone" type="button">Add Cone</button>
@@ -249,7 +251,7 @@
 
       <section class="panel__section panel__section--footer">
         <div class="tiny">
-          Tip: <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd> = Rotate/Move/Orbit • <kbd>Esc</kbd> clears selection • <kbd>F</kbd> focus • <kbd>Del</kbd> deletes prop
+          Tip: <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd> = Rotate/Move/Orbit/Scale • <kbd>Esc</kbd> clears selection • <kbd>F</kbd> focus • <kbd>Del</kbd> deletes prop
         </div>
         <div class="tiny tiny--muted">Built for GitHub Pages. No bundler. No nonsense.</div>
       </section>
@@ -281,6 +283,7 @@
           <li><b>Rotate:</b> use the gizmo rings. Toggle axes X/Y/Z. (<kbd>1</kbd>)</li>
           <li><b>Move:</b> switch to Move to translate the selected joint/prop. (<kbd>2</kbd>)</li>
           <li><b>Orbit:</b> use Orbit mode to move camera freely. (<kbd>3</kbd>)</li>
+          <li><b>Scale:</b> scale props normally; for body joints it scales the visible mesh only. (<kbd>4</kbd>)</li>
           <li><b>Save JSON:</b> downloads pose.json AND saves a thumbnail in gallery.</li>
           <li><b>Save to Gallery:</b> saves locally without downloading.</li>
           <li><b>Export:</b> downloads a PNG of the current view.</li>
