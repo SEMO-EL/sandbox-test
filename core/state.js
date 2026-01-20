@@ -11,7 +11,7 @@
 
 /**
  * @typedef {Object} AppState
- * @property {"rotate"|"move"|"orbit"} mode
+ * @property {"rotate"|"move"|"orbit"|"scale"} mode
  * @property {AxisState} axis
  * @property {number} snapDeg
  * @property {boolean} showGrid
