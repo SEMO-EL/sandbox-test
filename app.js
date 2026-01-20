@@ -1,6 +1,6 @@
 // app.js
 // PoseSandbox modular entrypoint — uses EVERY module in your tree.
-// Keeps behavior identical to your working monolithic app.js (selection, gizmo, gallery, presets, props, export, help, perf).
+// Adds: ✅ Scale mode (props scale normally; body joints scale only their visible mesh).
 
 import * as THREE from "three";
 
@@ -10,14 +10,13 @@ import { InputManager, bindPropButtons } from "./controls/inputs.js";
 import { ModesController } from "./controls/modes.js";
 import { SelectionController } from "./controls/selection.js";
 
-import { clamp, degToRad, makeToast, niceTime } from "./core/helpers.js";
+import { clamp, makeToast, niceTime } from "./core/helpers.js";
 import { createState, setShowAxes, setShowGrid, setShowOutline, setPerfEnabled } from "./core/state.js";
 import {
   createWorld,
   resetAllJointRotations as resetAllJointRotationsWorld,
   addProp as addPropWorld,
   removeProp as removePropWorld,
-  clearProps as clearPropsWorld,
   PROP_TYPES
 } from "./core/world.js";
 
@@ -43,6 +42,7 @@ const btnClear = document.getElementById("btnClear");
 const modeRotate = document.getElementById("modeRotate");
 const modeMove = document.getElementById("modeMove");
 const modeOrbit = document.getElementById("modeOrbit");
+const modeScale = document.getElementById("modeScale"); // ✅ NEW
 
 const axisX = document.getElementById("axisX");
 const axisY = document.getElementById("axisY");
@@ -136,20 +136,11 @@ try {
     renderer,
     STATE,
     showToast,
-    // we won’t use window listeners from engine/scene.js; Selection/Input handle events.
     onPointerDown: null,
     onKeyDown: null
   });
 
-  const {
-    scene,
-    camera,
-    orbit,
-    gizmo,
-    axesHelper,
-    gridHelper,
-    outline: engineOutline
-  } = sceneBundle;
+  const { scene, camera, orbit, gizmo, axesHelper, gridHelper, outline: engineOutline } = sceneBundle;
 
   // Background selector initial
   setBackgroundTone(scene, bgTone?.value || "midnight");
@@ -170,7 +161,7 @@ try {
   world.root = built.root;
   world.joints = built.joints;
 
-  /* Selection controller (we’ll route events via InputManager) */
+  /* Selection controller (we route events via InputManager) */
   const selection = new SelectionController({
     canvas,
     camera,
@@ -187,19 +178,18 @@ try {
     toast: showToast
   });
 
-  // SelectionController adds its own outline; we remove engine outline so it’s not duplicated.
-  try {
-    if (engineOutline) scene.remove(engineOutline);
-  } catch {}
+  // SelectionController adds its own outline; remove engine outline to avoid duplicates.
+  try { if (engineOutline) scene.remove(engineOutline); } catch {}
 
-  // IMPORTANT: we do NOT want SelectionController to bind window events (we use InputManager)
+  // We do NOT want SelectionController to bind window events (InputManager does), so kill its listeners.
   selection.destroy();
 
-  /* Modes controller (UI + gizmo/orbit + snap/axis) */
+  /* Modes controller */
   const modes = new ModesController({
     modeRotateBtn: modeRotate,
     modeMoveBtn: modeMove,
     modeOrbitBtn: modeOrbit,
+    modeScaleBtn: modeScale, // ✅ NEW
     axisXBtn: axisX,
     axisYBtn: axisY,
     axisZBtn: axisZ,
@@ -209,20 +199,20 @@ try {
     toast: showToast
   });
 
-  // Sync ModesController state -> core STATE (so other modules read consistent values)
+  // Sync ModesController -> STATE (single source of truth for other modules)
   const _setMode = modes.setMode.bind(modes);
   modes.setMode = (m) => {
     _setMode(m);
     STATE.mode = modes.state.mode;
+    // When mode changes, re-attach gizmo appropriately (scale target differs)
+    attachGizmoForCurrentMode();
     return STATE.mode;
   };
 
   const _toggleAxis = modes.toggleAxis.bind(modes);
   modes.toggleAxis = (k) => {
     const v = _toggleAxis(k);
-    STATE.axis.x = !!modes.state.axis.x;
-    STATE.axis.y = !!modes.state.axis.y;
-    STATE.axis.z = !!modes.state.axis.z;
+    STATE.axis = { ...modes.state.axis };
     return v;
   };
 
@@ -233,10 +223,70 @@ try {
     return v;
   };
 
-  // Initialize state from UI
   STATE.mode = modes.state.mode;
   STATE.axis = { ...modes.state.axis };
   STATE.snapDeg = modes.state.snapDeg;
+
+  /* ---------------------------- Scale targeting ---------------------------- */
+
+  function findFirstPickableMesh(obj) {
+    if (!obj) return null;
+    let found = null;
+    obj.traverse?.((o) => {
+      if (found) return;
+      if (o && o.isMesh && o.userData && o.userData.pickable) found = o;
+    });
+    return found;
+  }
+
+  function getGizmoTargetForSelection(sel) {
+    if (!sel) return null;
+
+    // Orbit mode: no gizmo
+    if (STATE.mode === "orbit") return null;
+
+    // Scale mode: special rule
+    if (STATE.mode === "scale") {
+      // Props: scale the whole group (keeps rotations/position coherent)
+      if (sel.userData?.isProp) return sel;
+
+      // Joints: scale ONLY the visible mesh under that joint (rig stays stable)
+      if (sel.userData?.isJoint) {
+        const mesh = findFirstPickableMesh(sel);
+        return mesh || sel;
+      }
+    }
+
+    // Rotate/Move: attach to the selected group itself (same as before)
+    return sel;
+  }
+
+  function attachGizmoForCurrentMode() {
+    const sel = selection.getSelected();
+    const target = getGizmoTargetForSelection(sel);
+
+    if (!target) {
+      gizmo.detach();
+      selection.updateOutline();
+      return;
+    }
+
+    gizmo.attach(target);
+    selection.updateOutline();
+  }
+
+  // Wrap selection.setSelection so gizmo attachment always follows our targeting rules
+  const _selSet = selection.setSelection.bind(selection);
+  selection.setSelection = (obj) => {
+    _selSet(obj);
+    attachGizmoForCurrentMode();
+  };
+
+  const _selClear = selection.clearSelection.bind(selection);
+  selection.clearSelection = () => {
+    _selClear();
+    gizmo.detach();
+  };
 
   /* ---------------------------- Props ---------------------------- */
 
@@ -246,7 +296,6 @@ try {
       if (o && o.isMesh) {
         o.castShadow = true;
         o.receiveShadow = true;
-        // pickable is set on mesh in core/world.js already, but keep it bulletproof:
         if (!o.userData) o.userData = {};
         o.userData.pickable = true;
       }
@@ -254,7 +303,6 @@ try {
   }
 
   function defaultPropColor(type) {
-    // small, consistent palette (not required, but helps visually)
     const t = String(type || "").toLowerCase();
     if (t === "cube") return 0x24d2ff;
     if (t === "sphere") return 0x7c5cff;
@@ -269,23 +317,15 @@ try {
     group?.traverse?.((o) => {
       if (o && o.isMesh && o.material) {
         o.material.color?.setHex?.(color);
-        // double-side for flat shapes (ring/disc/plane)
-        if (type === "ring" || type === "disc" || type === "plane") {
-          o.material.side = THREE.DoubleSide;
-        }
+        if (type === "ring" || type === "disc" || type === "plane") o.material.side = THREE.DoubleSide;
       }
     });
   }
 
   function spawnProp(type) {
     const t = String(type || "cube").toLowerCase();
+    const prop = addPropWorld(world, scene, t, { name: `prop_${t}_${world.props.length + 1}` });
 
-    // core/world creates + registers
-    const prop = addPropWorld(world, scene, t, {
-      name: `prop_${t}_${world.props.length + 1}`
-    });
-
-    // place it similar to your monolith
     prop.position.set((Math.random() - 0.5) * 2.0, 0.28, (Math.random() - 0.5) * 2.0);
 
     applyPropShadowsAndPickable(prop);
@@ -305,7 +345,6 @@ try {
     showToast("Prop deleted");
   }
 
-  /* Hook prop UI (cube/sphere and any future buttons that exist in HTML) */
   bindPropButtons({
     addProp: (type) => spawnProp(type),
     selectObject: (obj) => selection.setSelection(obj),
@@ -319,7 +358,6 @@ try {
   }
 
   function resetAllJointRotations() {
-    // use Character method if available (bulletproof reset); fallback to world helper
     if (character?.resetAllJointRotations) character.resetAllJointRotations();
     else resetAllJointRotationsWorld(world);
   }
@@ -391,11 +429,7 @@ try {
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(src, sx, sy, s, s, 0, 0, size, size);
 
-    try {
-      return thumb.toDataURL("image/png");
-    } catch {
-      return null;
-    }
+    try { return thumb.toDataURL("image/png"); } catch { return null; }
   }
 
   const gallery = new Gallery({
@@ -438,29 +472,13 @@ try {
     showToast("Help closed");
   }
 
-  btnHelp?.addEventListener("click", (e) => {
-    e.preventDefault();
-    openHelp();
-  });
-
-  btnCloseHelp?.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    closeHelp();
-  });
-
-  btnHelpOk?.addEventListener("click", (e) => {
-    e.preventDefault();
-    closeHelp();
-  });
-
-  helpModal?.addEventListener("click", (e) => {
-    if (e.target?.dataset?.close === "true") closeHelp();
-  });
+  btnHelp?.addEventListener("click", (e) => { e.preventDefault(); openHelp(); });
+  btnCloseHelp?.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); closeHelp(); });
+  btnHelpOk?.addEventListener("click", (e) => { e.preventDefault(); closeHelp(); });
+  helpModal?.addEventListener("click", (e) => { if (e.target?.dataset?.close === "true") closeHelp(); });
 
   /* ---------------------------- UI wiring ---------------------------- */
 
-  // visual toggles
   togGrid?.addEventListener("change", () => {
     setShowGrid(STATE, !!togGrid.checked);
     if (gridHelper) gridHelper.visible = !!STATE.showGrid;
@@ -476,21 +494,16 @@ try {
     selection.updateOutline();
   });
 
-  // pose buttons
   btnResetPose?.addEventListener("click", resetPose);
   btnRandomPose?.addEventListener("click", randomPose);
 
-  // save json (download) + save thumbnail to gallery
   btnSavePose?.addEventListener("click", () => {
     const data = serializePoseForGallery();
     downloadJson("pose.json", data);
-
-    // save to gallery too (no extra toast)
     gallery.saveCurrentPoseToGallery({ name: "", withToast: false });
     showToast("Saved pose.json + gallery");
   });
 
-  // load json (single)
   btnLoadPose?.addEventListener("click", () => filePose?.click?.());
   filePose?.addEventListener("change", async (e) => {
     const file = e.target?.files?.[0];
@@ -506,14 +519,11 @@ try {
     filePose.value = "";
   });
 
-  // export
   btnExport?.addEventListener("click", () => exportPNG(renderer, scene, camera));
 
-  // props
   btnDelProp?.addEventListener("click", deleteSelectedProp);
 
   btnScatter?.addEventListener("click", () => {
-    // Scatter a few random props; if you want only cube/sphere, replace list with ["cube","sphere"]
     const types = PROP_TYPES.length ? PROP_TYPES : ["cube", "sphere"];
     for (let i = 0; i < 5; i++) {
       const t = types[Math.floor(Math.random() * types.length)];
@@ -522,35 +532,30 @@ try {
     showToast("Scattered props");
   });
 
-  // background tone
-  bgTone?.addEventListener("change", () => {
-    setBackgroundTone(scene, bgTone.value);
-  });
+  bgTone?.addEventListener("change", () => setBackgroundTone(scene, bgTone.value));
 
-  // perf toggle
   btnPerf?.addEventListener("click", () => {
     setPerfEnabled(STATE, !STATE.perfEnabled);
     showToast(STATE.perfEnabled ? "Perf: ON" : "Perf: OFF");
   });
 
-  // gallery buttons
   btnSaveGallery?.addEventListener("click", () => gallery.saveCurrentPoseToGallery({ withToast: true }));
   btnRenamePose?.addEventListener("click", () => gallery.renameSelected());
   btnDeletePose?.addEventListener("click", () => gallery.deleteSelected());
   btnClearGallery?.addEventListener("click", () => gallery.clearAll());
 
-  /* ---------------------------- Keyboard + pointer via InputManager ---------------------------- */
+  /* ---------------------------- Input routing ---------------------------- */
 
   input.on("pointerdown", (evt) => {
-    // SelectionController expects the real PointerEvent
     selection.onPointerDown(evt.originalEvent);
+    // if something got selected, ensure gizmo target respects scale mode
+    attachGizmoForCurrentMode();
   });
 
   input.on("keydown", (evt) => {
     const e = evt.originalEvent;
     const k = String(evt.keyLower || "").toLowerCase();
 
-    // Escape: close help first, else clear selection (match your old behavior)
     if (e.key === "Escape") {
       if (helpModal && !helpModal.classList.contains("hidden")) {
         closeHelp();
@@ -560,33 +565,28 @@ try {
       return;
     }
 
-    // Shortcuts: modes
-    if (k === "1" || k === "2" || k === "3") {
+    // modes
+    if (k === "1" || k === "2" || k === "3" || k === "4") {
       modes.handleShortcut(k);
-      // ensure STATE is synced (wrappers already sync)
       return;
     }
 
-    // Focus
     if (k === "f") {
       selection.focusSelection();
       return;
     }
 
-    // Delete prop
     if (e.key === "Delete" || e.key === "Backspace") {
       deleteSelectedProp();
       return;
     }
 
-    // Ctrl/Cmd + S => save to gallery (no download)
     if ((e.ctrlKey || e.metaKey) && k === "s") {
       e.preventDefault();
       gallery.saveCurrentPoseToGallery({ withToast: true });
       return;
     }
 
-    // Let SelectionController keep its own small shortcuts (like F)
     selection.onKeyDown(e);
   });
 
@@ -598,7 +598,6 @@ try {
     });
   }
 
-  // ResizeObserver for canvas
   let ro = null;
   if ("ResizeObserver" in window) {
     ro = new ResizeObserver(() => onResize());
@@ -607,7 +606,7 @@ try {
   window.addEventListener("resize", onResize);
   onResize();
 
-  /* ---------------------------- Render loop ---------------------------- */
+  /* ---------------------------- Loop ---------------------------- */
   const loop = createLoop({
     orbit,
     renderer,
@@ -619,17 +618,16 @@ try {
     perf: {
       enabled: () => !!STATE.perfEnabled,
       onFps: (fpsSmoothed) => {
-        // same “occasional toast” idea as your monolith
         if (Math.random() < 0.02) showToast(`FPS ~ ${Number(fpsSmoothed).toFixed(0)}`, 900);
       }
     }
   });
 
-  // Apply initial visibility from STATE
   if (gridHelper) gridHelper.visible = !!STATE.showGrid;
   if (axesHelper) axesHelper.visible = !!STATE.showAxes;
 
   showToast("Ready. Click a joint or prop to pose.");
+  attachGizmoForCurrentMode();
   loop.start();
 } catch (err) {
   fatal(err);
