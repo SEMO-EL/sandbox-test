@@ -2,7 +2,9 @@
 // PoseSandbox modular entrypoint — uses EVERY module in your tree.
 // ✅ Scale mode (props scale normally; body joints scale only their visible mesh).
 // ✅ Symmetry toggle for BODY (mirrors L ↔ R on rotate + scale).
-// ✅ Import 3D model (.glb/.gltf) as a selectable prop (GitHub Pages friendly).
+// ✅ True reset (move + rotate + scale) using rest snapshot.
+// ✅ Import 3D (.glb/.gltf) + selectable like a prop.
+// ✅ Lighting controls (intensity/color/direction + presets).
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -23,7 +25,7 @@ import {
 } from "./core/world.js";
 
 import { createRenderer } from "./engine/renderer.js";
-import { createScene, setBackgroundTone } from "./engine/scene.js";
+import { createScene, setBackgroundTone, applyLightingPreset, setKeyDirectionByName } from "./engine/scene.js";
 import { createLoop } from "./engine/loop.js";
 
 import { Gallery } from "./gallery/gallery.js";
@@ -41,10 +43,6 @@ const selectionName = document.getElementById("selectionName");
 const btnFocus = document.getElementById("btnFocus");
 const btnClear = document.getElementById("btnClear");
 const btnSymmetry = document.getElementById("btnSymmetry");
-
-const btnImportModel = document.getElementById("btnImportModel");
-const btnClearModels = document.getElementById("btnClearModels");
-const fileModel = document.getElementById("fileModel");
 
 const modeRotate = document.getElementById("modeRotate");
 const modeMove = document.getElementById("modeMove");
@@ -77,6 +75,26 @@ const helpModal = document.getElementById("helpModal");
 const btnCloseHelp = document.getElementById("btnCloseHelp");
 const btnHelpOk = document.getElementById("btnHelpOk");
 const btnPerf = document.getElementById("btnPerf");
+
+/* Import 3D */
+const btnImport3D = document.getElementById("btnImport3D");
+const fileModel = document.getElementById("fileModel");
+
+/* Lighting UI */
+const lightPreset = document.getElementById("lightPreset");
+const keyDir = document.getElementById("keyDir");
+const keyIntensity = document.getElementById("keyIntensity");
+const keyColor = document.getElementById("keyColor");
+const fillIntensity = document.getElementById("fillIntensity");
+const fillColor = document.getElementById("fillColor");
+const rimIntensity = document.getElementById("rimIntensity");
+const rimColor = document.getElementById("rimColor");
+const ambIntensity = document.getElementById("ambIntensity");
+const ambColor = document.getElementById("ambColor");
+const hemiIntensity = document.getElementById("hemiIntensity");
+const hemiSky = document.getElementById("hemiSky");
+const hemiGround = document.getElementById("hemiGround");
+const btnResetLights = document.getElementById("btnResetLights");
 
 /* Gallery DOM */
 const btnSaveGallery = document.getElementById("btnSaveGallery");
@@ -118,11 +136,18 @@ function exportPNG(renderer, scene, camera) {
   showToast("Exported PNG");
 }
 
-function basename(path) {
-  const s = String(path || "");
-  const clean = s.split("?")[0].split("#")[0];
-  const parts = clean.split(/[\\/]/g);
-  return parts[parts.length - 1] || clean;
+function hexToColorInput(c) {
+  const col = new THREE.Color(c);
+  return `#${col.getHexString()}`;
+}
+
+function colorInputToHex(v) {
+  try {
+    const col = new THREE.Color(v);
+    return col.getHex();
+  } catch {
+    return 0xffffff;
+  }
 }
 
 /* ---------------------------- Boot ---------------------------- */
@@ -157,7 +182,16 @@ try {
     onKeyDown: null
   });
 
-  const { scene, camera, orbit, gizmo, axesHelper, gridHelper, outline: engineOutline } = sceneBundle;
+  const {
+    scene,
+    camera,
+    orbit,
+    gizmo,
+    axesHelper,
+    gridHelper,
+    outline: engineOutline,
+    lights
+  } = sceneBundle;
 
   // Background selector initial
   setBackgroundTone(scene, bgTone?.value || "midnight");
@@ -178,7 +212,7 @@ try {
   world.root = built.root;
   world.joints = built.joints;
 
-  /* ---------------------------- Scale targeting helpers ---------------------------- */
+  /* ---------------------------- Scale targeting ---------------------------- */
 
   function findFirstPickableMesh(obj) {
     if (!obj) return null;
@@ -190,8 +224,8 @@ try {
     return found;
   }
 
-  /* ---------------- REST POSE SNAPSHOT (true reset) ---------------- */
-  const REST = new Map(); // joint.name => { pos, quat, scale, meshScale? }
+  // ---------------- REST POSE SNAPSHOT (for true reset) ----------------
+  const REST = new Map(); // key: joint.name => { pos, quat, scale, meshScale? }
 
   function snapshotRestPose() {
     REST.clear();
@@ -205,7 +239,6 @@ try {
       });
     });
   }
-
   snapshotRestPose();
 
   /* Selection controller (we route events via InputManager) */
@@ -246,37 +279,6 @@ try {
     toast: showToast
   });
 
-  /* ---------------- Gizmo target rules ---------------- */
-
-  function getGizmoTargetForSelection(sel) {
-    if (!sel) return null;
-    if (STATE.mode === "orbit") return null;
-
-    if (STATE.mode === "scale") {
-      if (sel.userData?.isProp) return sel;
-      if (sel.userData?.isJoint) {
-        const mesh = findFirstPickableMesh(sel);
-        return mesh || sel;
-      }
-    }
-
-    return sel;
-  }
-
-  function attachGizmoForCurrentMode() {
-    const sel = selection.getSelected();
-    const target = getGizmoTargetForSelection(sel);
-
-    if (!target) {
-      gizmo.detach();
-      selection.updateOutline();
-      return;
-    }
-
-    gizmo.attach(target);
-    selection.updateOutline();
-  }
-
   // Sync ModesController -> STATE
   const _setMode = modes.setMode.bind(modes);
   modes.setMode = (m) => {
@@ -303,6 +305,39 @@ try {
   STATE.mode = modes.state.mode;
   STATE.axis = { ...modes.state.axis };
   STATE.snapDeg = modes.state.snapDeg;
+
+  function getGizmoTargetForSelection(sel) {
+    if (!sel) return null;
+    if (STATE.mode === "orbit") return null;
+
+    if (STATE.mode === "scale") {
+      if (sel.userData?.isProp) return sel;
+      if (sel.userData?.isJoint) {
+        const mesh = findFirstPickableMesh(sel);
+        return mesh || sel;
+      }
+      // Imported model: scale its root (we store importRoot)
+      if (sel.userData?.isImportedModel && sel.userData.importRoot) return sel.userData.importRoot;
+    }
+
+    // Rotate/Move:
+    if (sel.userData?.isImportedModel && sel.userData.importRoot) return sel.userData.importRoot;
+    return sel;
+  }
+
+  function attachGizmoForCurrentMode() {
+    const sel = selection.getSelected();
+    const target = getGizmoTargetForSelection(sel);
+
+    if (!target) {
+      gizmo.detach();
+      selection.updateOutline();
+      return;
+    }
+
+    gizmo.attach(target);
+    selection.updateOutline();
+  }
 
   // Wrap selection.setSelection so gizmo follows our targeting rules
   const _selSet = selection.setSelection.bind(selection);
@@ -391,6 +426,7 @@ try {
 
   updateSymmetryButtonUI();
 
+  // Listen to gizmo edits; mirror when enabled
   gizmo.addEventListener("objectChange", () => {
     if (!SYM.enabled) return;
 
@@ -452,12 +488,36 @@ try {
     return prop;
   }
 
+  function disposeObject3D(root) {
+    if (!root) return;
+    root.traverse?.((o) => {
+      if (o?.geometry) o.geometry.dispose?.();
+      if (o?.material) {
+        if (Array.isArray(o.material)) o.material.forEach((m) => m?.dispose?.());
+        else o.material.dispose?.();
+      }
+    });
+  }
+
   function deleteSelectedProp() {
     const sel = selection.getSelected();
-    if (!sel || !sel.userData?.isProp) {
+    if (!sel) return showToast("Select a prop to delete");
+
+    // Imported model deletion
+    if (sel.userData?.isImportedModel) {
+      const root = sel.userData.importRoot || sel;
+      scene.remove(root);
+      disposeObject3D(root);
+      selection.clearSelection();
+      showToast("Imported model deleted");
+      return;
+    }
+
+    if (!sel.userData?.isProp) {
       showToast("Select a prop to delete");
       return;
     }
+
     removePropWorld(world, scene, sel);
     selection.clearSelection();
     showToast("Prop deleted");
@@ -471,165 +531,95 @@ try {
 
   /* ---------------------------- Import 3D (.glb/.gltf) ---------------------------- */
 
-  function fitToGroundAndCenter(group, targetHeight = 2.0) {
-    const box = new THREE.Box3().setFromObject(group);
+  const importedRoots = [];
+
+  function computeBounds(root) {
+    const box = new THREE.Box3().setFromObject(root);
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
     box.getSize(size);
     box.getCenter(center);
-
-    const h = Math.max(1e-6, size.y);
-    const s = targetHeight / h;
-
-    group.scale.multiplyScalar(s);
-
-    // re-evaluate after scaling
-    const box2 = new THREE.Box3().setFromObject(group);
-    const center2 = new THREE.Vector3();
-    box2.getCenter(center2);
-
-    // center XZ at origin
-    group.position.x += -center2.x;
-    group.position.z += -center2.z;
-
-    // put on floor y=0
-    const minY = box2.min.y;
-    group.position.y += -minY;
+    return { box, size, center };
   }
 
-  function markModelPickable(root) {
+  function normalizeImportedModel(root) {
+    // center to origin and scale to sane size
+    const { size, center } = computeBounds(root);
+
+    if (Number.isFinite(center.x)) root.position.sub(center);
+
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const target = 2.2; // roughly character-sized
+    const s = target / maxDim;
+    root.scale.setScalar(s);
+
+    // put it on the floor (y=0)
+    const box2 = new THREE.Box3().setFromObject(root);
+    const minY = box2.min.y;
+    if (Number.isFinite(minY)) root.position.y -= minY;
+
+    // move near character
+    root.position.x += 1.6;
+    root.position.z += 0.0;
+  }
+
+  function markImportedPickable(root) {
+    root.userData.isProp = true; // so gizmo + selection UI feels consistent
+    root.userData.isImportedRoot = true;
+
     root.traverse((o) => {
-      if (o && o.isMesh) {
+      if (!o.userData) o.userData = {};
+      if (o.isMesh) {
         o.castShadow = true;
         o.receiveShadow = true;
-        if (!o.userData) o.userData = {};
         o.userData.pickable = true;
+
+        // Selection hits meshes, so mark them as imported + store root for delete/transform targeting
+        o.userData.isImportedModel = true;
+        o.userData.importRoot = root;
+        o.userData.isProp = true;
       }
     });
   }
 
-  function revokeGroupBlobUrls(group) {
-    const urls = group?.userData?._blobUrls;
-    if (Array.isArray(urls)) {
-      urls.forEach((u) => {
-        try { URL.revokeObjectURL(u); } catch {}
+  async function importGLTFFile(file) {
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    try {
+      const loader = new GLTFLoader();
+      const gltf = await new Promise((resolve, reject) => {
+        loader.load(url, resolve, undefined, reject);
       });
-    }
-    if (group?.userData) group.userData._blobUrls = [];
-  }
 
-  const importedModels = []; // store groups we imported so we can clear
+      const root = gltf.scene || gltf.scenes?.[0];
+      if (!root) throw new Error("No scene in GLTF");
 
-  async function importModelFromFiles(fileList) {
-    const files = Array.from(fileList || []);
-    if (!files.length) return;
+      root.name = file.name || "ImportedModel";
+      normalizeImportedModel(root);
+      markImportedPickable(root);
 
-    const glb = files.find((f) => f.name.toLowerCase().endsWith(".glb")) || null;
-    const gltf = files.find((f) => f.name.toLowerCase().endsWith(".gltf")) || null;
+      scene.add(root);
+      importedRoots.push(root);
 
-    const main = glb || gltf;
-    if (!main) {
-      showToast("Pick a .glb or .gltf file", 1800);
-      return;
-    }
-
-    // Map every selected file name -> blob URL (so .gltf can resolve .bin + textures)
-    const map = new Map();
-    const blobUrls = [];
-    for (const f of files) {
-      const url = URL.createObjectURL(f);
-      blobUrls.push(url);
-      map.set(f.name, url);
-      map.set(f.name.toLowerCase(), url);
-    }
-
-    const manager = new THREE.LoadingManager();
-    manager.setURLModifier((url) => {
-      const b = basename(url);
-      const hit = map.get(b) || map.get(b.toLowerCase());
-      return hit || url;
-    });
-
-    const loader = new GLTFLoader(manager);
-
-    const mainUrl = map.get(main.name) || map.get(main.name.toLowerCase());
-    if (!mainUrl) {
-      showToast("Import failed: missing main file URL", 1800);
-      return;
-    }
-
-    showToast("Importing 3D…");
-
-    const gltfData = await new Promise((resolve, reject) => {
-      loader.load(
-        mainUrl,
-        (g) => resolve(g),
-        undefined,
-        (e) => reject(e)
-      );
-    }).catch((e) => {
+      selection.setSelection(root);
+      selection.focusSelection?.();
+      showToast(`Imported: ${root.name}`);
+    } catch (e) {
       console.warn(e);
-      showToast("Import failed (bad file?)", 2000);
-      return null;
-    });
-
-    if (!gltfData) {
-      // cleanup urls
-      blobUrls.forEach((u) => { try { URL.revokeObjectURL(u); } catch {} });
-      return;
+      showToast("Import failed (invalid .glb/.gltf)", 1800);
+    } finally {
+      URL.revokeObjectURL(url);
     }
-
-    const model = gltfData.scene || new THREE.Group();
-    model.name = `model_${main.name}`;
-    if (!model.userData) model.userData = {};
-    model.userData.isProp = true; // treat imported model as a prop (selection works)
-    model.userData.type = "model";
-    model.userData._blobUrls = blobUrls;
-
-    markModelPickable(model);
-    fitToGroundAndCenter(model, 2.0);
-
-    // Register it like a prop:
-    world.props.push(model);
-    scene.add(model);
-    importedModels.push(model);
-
-    // select it
-    selection.setSelection(model);
-
-    showToast("Imported model ✅");
   }
 
-  function clearImportedModels() {
-    if (!importedModels.length) {
-      showToast("No imported models", 1200);
-      return;
-    }
-
-    // remove from scene + world.props and free blob URLs
-    importedModels.forEach((g) => {
-      try {
-        revokeGroupBlobUrls(g);
-        scene.remove(g);
-      } catch {}
-      const idx = world.props.indexOf(g);
-      if (idx >= 0) world.props.splice(idx, 1);
-    });
-
-    importedModels.length = 0;
-    selection.clearSelection();
-    showToast("Cleared imported models");
-  }
-
-  btnImportModel?.addEventListener("click", () => fileModel?.click?.());
+  btnImport3D?.addEventListener("click", () => fileModel?.click?.());
   fileModel?.addEventListener("change", async (e) => {
-    const files = e.target?.files;
-    if (!files || !files.length) return;
-    await importModelFromFiles(files);
+    const file = e.target?.files?.[0];
+    if (!file) return;
+    await importGLTFFile(file);
     fileModel.value = "";
   });
-
-  btnClearModels?.addEventListener("click", clearImportedModels);
 
   /* ---------------------------- Pose I/O ---------------------------- */
 
@@ -638,18 +628,14 @@ try {
   }
 
   function resetAllJointRotations() {
-    // For presets: reset joint rotations only
-    if (character?.resetAllJointRotations) character.resetAllJointRotations();
-    else {
-      (world.joints || []).forEach((j) => {
-        j.rotation.set(0, 0, 0);
-        j.quaternion.identity();
-      });
-    }
+    (world.joints || []).forEach((j) => {
+      const r = REST.get(j.name);
+      if (r?.quat) j.quaternion.copy(r.quat);
+      else j.rotation.set(0, 0, 0);
+    });
   }
 
   function resetAllJointTransforms() {
-    // Restore joints to exact built/rest pose (position + rotation + scale)
     (world.joints || []).forEach((j) => {
       const r = REST.get(j.name);
       if (!r) return;
@@ -658,7 +644,6 @@ try {
       j.quaternion.copy(r.quat);
       j.scale.copy(r.scale);
 
-      // Also restore the visible mesh scale for Scale-mode body edits
       const mesh = findFirstPickableMesh(j);
       if (mesh && r.meshScale) mesh.scale.copy(r.meshScale);
     });
@@ -780,6 +765,81 @@ try {
   btnHelpOk?.addEventListener("click", (e) => { e.preventDefault(); closeHelp(); });
   helpModal?.addEventListener("click", (e) => { if (e.target?.dataset?.close === "true") closeHelp(); });
 
+  /* ---------------------------- Lighting wiring ---------------------------- */
+
+  function syncLightingUIFromLights() {
+    if (!lights) return;
+
+    keyIntensity && (keyIntensity.value = String(lights.key.intensity ?? 0));
+    fillIntensity && (fillIntensity.value = String(lights.fill.intensity ?? 0));
+    rimIntensity && (rimIntensity.value = String(lights.rim.intensity ?? 0));
+    ambIntensity && (ambIntensity.value = String(lights.ambient.intensity ?? 0));
+    hemiIntensity && (hemiIntensity.value = String(lights.hemi.intensity ?? 0));
+
+    keyColor && (keyColor.value = hexToColorInput(lights.key.color));
+    fillColor && (fillColor.value = hexToColorInput(lights.fill.color));
+    rimColor && (rimColor.value = hexToColorInput(lights.rim.color));
+    ambColor && (ambColor.value = hexToColorInput(lights.ambient.color));
+
+    hemiSky && (hemiSky.value = hexToColorInput(lights.hemi.color));
+    hemiGround && (hemiGround.value = hexToColorInput(lights.hemi.groundColor));
+  }
+
+  function applyLightingUIToLights() {
+    if (!lights) return;
+
+    lights.key.intensity = Number(keyIntensity?.value ?? lights.key.intensity);
+    lights.fill.intensity = Number(fillIntensity?.value ?? lights.fill.intensity);
+    lights.rim.intensity = Number(rimIntensity?.value ?? lights.rim.intensity);
+    lights.ambient.intensity = Number(ambIntensity?.value ?? lights.ambient.intensity);
+    lights.hemi.intensity = Number(hemiIntensity?.value ?? lights.hemi.intensity);
+
+    if (keyColor) lights.key.color.setHex(colorInputToHex(keyColor.value));
+    if (fillColor) lights.fill.color.setHex(colorInputToHex(fillColor.value));
+    if (rimColor) lights.rim.color.setHex(colorInputToHex(rimColor.value));
+    if (ambColor) lights.ambient.color.setHex(colorInputToHex(ambColor.value));
+
+    if (hemiSky) lights.hemi.color.setHex(colorInputToHex(hemiSky.value));
+    if (hemiGround) lights.hemi.groundColor.setHex(colorInputToHex(hemiGround.value));
+
+    // key direction dropdown
+    if (keyDir) setKeyDirectionByName(lights, keyDir.value);
+
+    renderer.render(scene, camera);
+  }
+
+  function setLightingPreset(name) {
+    if (!lights) return;
+    const preset = String(name || "studio");
+    applyLightingPreset(lights, preset);
+
+    // keep direction dropdown coherent for "studio"
+    if (keyDir && preset === "studio") keyDir.value = "front_right";
+
+    syncLightingUIFromLights();
+    renderer.render(scene, camera);
+    showToast(`Lighting: ${preset}`);
+  }
+
+  lightPreset?.addEventListener("change", () => setLightingPreset(lightPreset.value));
+  keyDir?.addEventListener("change", () => applyLightingUIToLights());
+
+  [
+    keyIntensity, keyColor,
+    fillIntensity, fillColor,
+    rimIntensity, rimColor,
+    ambIntensity, ambColor,
+    hemiIntensity, hemiSky, hemiGround
+  ].forEach((el) => el?.addEventListener("input", applyLightingUIToLights));
+
+  btnResetLights?.addEventListener("click", () => {
+    const preset = lightPreset?.value || "studio";
+    setLightingPreset(preset);
+  });
+
+  // init lighting UI from current scene defaults
+  syncLightingUIFromLights();
+
   /* ---------------------------- UI wiring ---------------------------- */
 
   togGrid?.addEventListener("change", () => {
@@ -890,7 +950,7 @@ try {
       return;
     }
 
-    // Ctrl/Cmd + M => toggle symmetry
+    // Ctrl/Cmd + M => toggle symmetry quickly
     if ((e.ctrlKey || e.metaKey) && k === "m") {
       e.preventDefault();
       SYM.enabled = !SYM.enabled;
@@ -937,6 +997,9 @@ try {
 
   if (gridHelper) gridHelper.visible = !!STATE.showGrid;
   if (axesHelper) axesHelper.visible = !!STATE.showAxes;
+
+  // Init lighting preset from dropdown (keeps UI + scene in sync)
+  setLightingPreset(lightPreset?.value || "studio");
 
   showToast("Ready. Click a joint or prop to pose.");
   attachGizmoForCurrentMode();
