@@ -306,24 +306,26 @@ try {
   STATE.axis = { ...modes.state.axis };
   STATE.snapDeg = modes.state.snapDeg;
 
-  function getGizmoTargetForSelection(sel) {
-    if (!sel) return null;
-    if (STATE.mode === "orbit") return null;
+ function getGizmoTargetForSelection(sel) {
+  if (!sel) return null;
+  if (STATE.mode === "orbit") return null;
 
-    if (STATE.mode === "scale") {
-      if (sel.userData?.isProp) return sel;
-      if (sel.userData?.isJoint) {
-        const mesh = findFirstPickableMesh(sel);
-        return mesh || sel;
-      }
-      // Imported model: scale its root (we store importRoot)
-      if (sel.userData?.isImportedModel && sel.userData.importRoot) return sel.userData.importRoot;
-    }
-
-    // Rotate/Move:
-    if (sel.userData?.isImportedModel && sel.userData.importRoot) return sel.userData.importRoot;
-    return sel;
+  // ✅ imported mesh clicked? scale/rotate/move the import root
+  if (sel.userData?.importRoot && sel.userData.importRoot.userData?.isImportedRoot) {
+    return sel.userData.importRoot;
   }
+
+  if (STATE.mode === "scale") {
+    if (sel.userData?.isProp) return sel;
+    if (sel.userData?.isJoint) {
+      const mesh = findFirstPickableMesh(sel);
+      return mesh || sel;
+    }
+  }
+
+  return sel;
+}
+
 
   function attachGizmoForCurrentMode() {
     const sel = selection.getSelected();
@@ -910,9 +912,18 @@ try {
   /* ---------------------------- Input routing ---------------------------- */
 
   input.on("pointerdown", (evt) => {
-    selection.onPointerDown(evt.originalEvent);
-    attachGizmoForCurrentMode();
-  });
+  selection.onPointerDown(evt.originalEvent);
+
+  // ✅ If a child mesh of an imported model is selected, promote to the import root
+  const sel = selection.getSelected?.();
+  const root = sel?.userData?.importRoot;
+  if (root && root.userData?.isImportedRoot) {
+    selection.setSelection(root);
+  }
+
+  attachGizmoForCurrentMode();
+});
+
 
   input.on("keydown", (evt) => {
     const e = evt.originalEvent;
