@@ -166,6 +166,25 @@ try {
   world.root = built.root;
   world.joints = built.joints;
 
+  // ---------------- REST POSE SNAPSHOT (for true reset) ----------------
+const REST = new Map(); // key: joint.name => { pos, quat, scale, meshScale? }
+
+function snapshotRestPose() {
+  REST.clear();
+  (world.joints || []).forEach((j) => {
+    const mesh = findFirstPickableMesh(j); // you already have this helper
+    REST.set(j.name, {
+      pos: j.position.clone(),
+      quat: j.quaternion.clone(),
+      scale: j.scale.clone(),
+      meshScale: mesh ? mesh.scale.clone() : null
+    });
+  });
+}
+
+// Call once right after character is built
+snapshotRestPose();
+
   /* Selection controller (we route events via InputManager) */
   const selection = new SelectionController({
     canvas,
@@ -455,10 +474,32 @@ try {
     return serializePose({ world, poseNotesEl: poseNotes });
   }
 
-  function resetAllJointRotations() {
-    if (character?.resetAllJointRotations) character.resetAllJointRotations();
-    else resetAllJointRotationsWorld(world);
-  }
+ function resetAllJointTransforms() {
+  // Restore joints to exact built/rest pose (position + rotation + scale)
+  (world.joints || []).forEach((j) => {
+    const r = REST.get(j.name);
+    if (!r) return;
+
+    j.position.copy(r.pos);
+    j.quaternion.copy(r.quat);
+    j.scale.copy(r.scale);
+
+    // Also restore the visible mesh scale for Scale-mode body edits
+    const mesh = findFirstPickableMesh(j);
+    if (mesh && r.meshScale) mesh.scale.copy(r.meshScale);
+  });
+}
+
+function resetPose() {
+  resetAllJointTransforms();
+
+  // optional: also clear selection/gizmo so you see it cleanly
+  selection.updateOutline();
+  attachGizmoForCurrentMode();
+
+  showToast("Pose reset (move + rotate + scale)");
+}
+
 
   function forceRenderOnce() {
     renderer.render(scene, camera);
@@ -484,12 +525,6 @@ try {
       updateOutline: () => selection.updateOutline(),
       forceRenderOnce
     });
-  }
-
-  function resetPose() {
-    resetAllJointRotations();
-    selection.updateOutline();
-    showToast("Pose reset");
   }
 
   function randomPose() {
