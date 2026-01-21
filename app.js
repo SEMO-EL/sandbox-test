@@ -1,6 +1,7 @@
 // app.js
 // PoseSandbox modular entrypoint — uses EVERY module in your tree.
 // Adds: ✅ Scale mode (props scale normally; body joints scale only their visible mesh).
+// Adds: ✅ Duplicate button in Selection (duplicates selected prop).
 
 import * as THREE from "three";
 
@@ -38,6 +39,7 @@ const toastEl = document.getElementById("toast");
 const selectionName = document.getElementById("selectionName");
 const btnFocus = document.getElementById("btnFocus");
 const btnClear = document.getElementById("btnClear");
+const btnDuplicateSelected = document.getElementById("btnDuplicateSelected"); // ✅ NEW
 
 const modeRotate = document.getElementById("modeRotate");
 const modeMove = document.getElementById("modeMove");
@@ -179,7 +181,9 @@ try {
   });
 
   // SelectionController adds its own outline; remove engine outline to avoid duplicates.
-  try { if (engineOutline) scene.remove(engineOutline); } catch {}
+  try {
+    if (engineOutline) scene.remove(engineOutline);
+  } catch {}
 
   // We do NOT want SelectionController to bind window events (InputManager does), so kill its listeners.
   selection.destroy();
@@ -204,7 +208,6 @@ try {
   modes.setMode = (m) => {
     _setMode(m);
     STATE.mode = modes.state.mode;
-    // When mode changes, re-attach gizmo appropriately (scale target differs)
     attachGizmoForCurrentMode();
     return STATE.mode;
   };
@@ -345,6 +348,54 @@ try {
     showToast("Prop deleted");
   }
 
+  function duplicateSelectedProp() {
+    const sel = selection.getSelected();
+    if (!sel || !sel.userData?.isProp) {
+      showToast("Select a prop to duplicate");
+      return null;
+    }
+
+    // Deep clone
+    const clone = sel.clone(true);
+
+    // Ensure userdata is not shared
+    clone.userData = { ...(sel.userData || {}) };
+    clone.userData.isProp = true;
+
+    // Unique name
+    const t = String(clone.userData.type || "prop");
+    clone.name = `prop_${t}_${world.props.length + 1}`;
+
+    // Copy transforms with a small offset so it's visible
+    clone.position.copy(sel.position).add(new THREE.Vector3(0.25, 0, 0.25));
+    clone.quaternion.copy(sel.quaternion);
+    clone.scale.copy(sel.scale);
+
+    // Make sure meshes remain pickable + have independent materials
+    clone.traverse((o) => {
+      if (o && o.isMesh) {
+        o.castShadow = true;
+        o.receiveShadow = true;
+
+        if (!o.userData) o.userData = {};
+        o.userData.pickable = true;
+
+        if (o.material) {
+          // Avoid changing both props when editing material later
+          o.material = o.material.clone();
+        }
+      }
+    });
+
+    // Register into world + scene
+    world.props.push(clone);
+    scene.add(clone);
+
+    selection.setSelection(clone);
+    showToast("Prop duplicated");
+    return clone;
+  }
+
   bindPropButtons({
     addProp: (type) => spawnProp(type),
     selectObject: (obj) => selection.setSelection(obj),
@@ -429,7 +480,11 @@ try {
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(src, sx, sy, s, s, 0, 0, size, size);
 
-    try { return thumb.toDataURL("image/png"); } catch { return null; }
+    try {
+      return thumb.toDataURL("image/png");
+    } catch {
+      return null;
+    }
   }
 
   const gallery = new Gallery({
@@ -472,10 +527,22 @@ try {
     showToast("Help closed");
   }
 
-  btnHelp?.addEventListener("click", (e) => { e.preventDefault(); openHelp(); });
-  btnCloseHelp?.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); closeHelp(); });
-  btnHelpOk?.addEventListener("click", (e) => { e.preventDefault(); closeHelp(); });
-  helpModal?.addEventListener("click", (e) => { if (e.target?.dataset?.close === "true") closeHelp(); });
+  btnHelp?.addEventListener("click", (e) => {
+    e.preventDefault();
+    openHelp();
+  });
+  btnCloseHelp?.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closeHelp();
+  });
+  btnHelpOk?.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeHelp();
+  });
+  helpModal?.addEventListener("click", (e) => {
+    if (e.target?.dataset?.close === "true") closeHelp();
+  });
 
   /* ---------------------------- UI wiring ---------------------------- */
 
@@ -544,11 +611,13 @@ try {
   btnDeletePose?.addEventListener("click", () => gallery.deleteSelected());
   btnClearGallery?.addEventListener("click", () => gallery.clearAll());
 
+  // ✅ NEW: duplicate button (props only)
+  btnDuplicateSelected?.addEventListener("click", () => duplicateSelectedProp());
+
   /* ---------------------------- Input routing ---------------------------- */
 
   input.on("pointerdown", (evt) => {
     selection.onPointerDown(evt.originalEvent);
-    // if something got selected, ensure gizmo target respects scale mode
     attachGizmoForCurrentMode();
   });
 
@@ -581,9 +650,17 @@ try {
       return;
     }
 
+    // Ctrl/Cmd + S => save to gallery
     if ((e.ctrlKey || e.metaKey) && k === "s") {
       e.preventDefault();
       gallery.saveCurrentPoseToGallery({ withToast: true });
+      return;
+    }
+
+    // ✅ Ctrl/Cmd + D => duplicate selected prop
+    if ((e.ctrlKey || e.metaKey) && k === "d") {
+      e.preventDefault();
+      duplicateSelectedProp();
       return;
     }
 
