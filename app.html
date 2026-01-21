@@ -79,9 +79,9 @@
           <button class="btn" id="btnClear" type="button" title="Clear selection">Clear</button>
         </div>
 
-        <!-- ✅ NEW: Symmetry toggle -->
+        <!-- ✅ Symmetry toggle (body) -->
         <div class="row">
-          <button class="btn" id="btnSymmetry" type="button" title="Mirror body edits: L ↔ R">
+          <button class="btn" id="btnSymmetry" type="button" title="Mirror body edits: L ↔ R (Rotate + Scale)">
             Symmetry: Off
           </button>
         </div>
@@ -135,7 +135,7 @@
         <h2 class="panel__title">Pose</h2>
 
         <div class="row row--split">
-          <button class="btn" id="btnResetPose" type="button" title="Reset joint rotations">Reset</button>
+          <button class="btn" id="btnResetPose" type="button" title="Reset joint transforms (move + rotate + scale)">Reset</button>
           <button class="btn" id="btnRandomPose" type="button" title="Randomize pose (mild)">Random</button>
         </div>
 
@@ -257,7 +257,7 @@
 
       <section class="panel__section panel__section--footer">
         <div class="tiny">
-          Tip: <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd> = Rotate/Move/Orbit/Scale • <kbd>Esc</kbd> clears selection • <kbd>F</kbd> focus • <kbd>Del</kbd> deletes prop
+          Tip: <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd> = Rotate/Move/Orbit/Scale • <kbd>Esc</kbd> clears selection • <kbd>F</kbd> focus • <kbd>Del</kbd> deletes prop • <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>M</kbd> symmetry
         </div>
         <div class="tiny tiny--muted">Built for GitHub Pages. No bundler. No nonsense.</div>
       </section>
@@ -290,7 +290,7 @@
           <li><b>Move:</b> switch to Move to translate the selected joint/prop. (<kbd>2</kbd>)</li>
           <li><b>Orbit:</b> use Orbit mode to move camera freely. (<kbd>3</kbd>)</li>
           <li><b>Scale:</b> scale props normally; for body joints it scales the visible mesh only. (<kbd>4</kbd>)</li>
-          <li><b>Symmetry:</b> mirrors body edits L ↔ R (rotate + scale).</li>
+          <li><b>Symmetry:</b> mirrors body edits L ↔ R (rotate + scale). (<kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>M</kbd>)</li>
           <li><b>Save JSON:</b> downloads pose.json AND saves a thumbnail in gallery.</li>
           <li><b>Save to Gallery:</b> saves locally without downloading.</li>
           <li><b>Export:</b> downloads a PNG of the current view.</li>
