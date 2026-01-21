@@ -27,6 +27,7 @@ export function createScene({
   const scene = new THREE.Scene();
   setBackgroundTone(scene, "midnight");
 
+  // Camera (same as app.js)
   const camera = new THREE.PerspectiveCamera(
     55,
     (canvas.clientWidth || 1) / (canvas.clientHeight || 1),
@@ -36,11 +37,13 @@ export function createScene({
   camera.position.set(4.6, 3.7, 6.2);
   camera.lookAt(0, 1.1, 0);
 
+  // Orbit controls (same settings)
   const orbit = new OrbitControls(camera, renderer.domElement);
   orbit.enableDamping = true;
   orbit.dampingFactor = 0.06;
   orbit.target.set(0, 1.05, 0);
 
+  // Lighting (same as app.js)
   scene.add(new THREE.HemisphereLight(0x9bb2ff, 0x151a22, 0.35));
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.22);
@@ -49,6 +52,7 @@ export function createScene({
   const key = new THREE.DirectionalLight(0xffffff, 0.92);
   key.position.set(6, 10, 3);
   key.castShadow = true;
+
   key.shadow.mapSize.set(2048, 2048);
   key.shadow.camera.near = 1;
   key.shadow.camera.far = 40;
@@ -58,6 +62,7 @@ export function createScene({
   key.shadow.camera.bottom = -12;
   key.shadow.bias = -0.00025;
   key.shadow.normalBias = 0.02;
+
   scene.add(key);
 
   const fill = new THREE.DirectionalLight(0x88bbff, 0.30);
@@ -68,6 +73,7 @@ export function createScene({
   rim.position.set(-2, 3, 8);
   scene.add(rim);
 
+  // Floor + grid + axes (same)
   const floorMat = new THREE.MeshStandardMaterial({
     color: 0x131826,
     metalness: 0.05,
@@ -87,15 +93,18 @@ export function createScene({
   axesHelper.visible = false;
   scene.add(axesHelper);
 
+  // Raycaster + pointer (same)
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
 
+  // Transform controls (gizmo) (same)
   const gizmo = new TransformControls(camera, renderer.domElement);
   gizmo.setMode("rotate");
   gizmo.setSpace("local");
   gizmo.size = 0.85;
 
   gizmo.addEventListener("dragging-changed", (e) => {
+    // Orbit ONLY when Orbit mode is active, never during gizmo drag
     if (orbit) orbit.enabled = !e.value && (STATE?.mode === "orbit");
     if (e.value && typeof showToast === "function") {
       showToast(STATE?.mode === "move" ? "Moving…" : "Rotating…");
@@ -104,13 +113,16 @@ export function createScene({
 
   scene.add(gizmo);
 
+  // Outline helper (same)
   const outline = new THREE.BoxHelper(new THREE.Object3D(), 0x24d2ff);
   outline.visible = false;
   scene.add(outline);
 
+  // Hook events (keep same behavior as your monolith)
   if (typeof onPointerDown === "function") window.addEventListener("pointerdown", onPointerDown);
   if (typeof onKeyDown === "function") window.addEventListener("keydown", onKeyDown);
 
+  // Initial visibility derived from STATE if provided
   if (STATE) {
     gridHelper.visible = !!STATE.showGrid;
     axesHelper.visible = !!STATE.showAxes;
