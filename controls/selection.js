@@ -1,6 +1,6 @@
 // controls/Selection.js
 // Owns: picking + selection state, outline, focus camera, selection name UI, clear.
-// Does NOT duplicate other modules. Use from your main app/engine glue.
+// Fix: imported models remain selectable after Esc (scene-wide pickables + importRoot promotion).
 
 import * as THREE from "three";
 
@@ -18,7 +18,7 @@ export class SelectionController {
    *  btnClear?: HTMLElement,
    *  helpModal?: HTMLElement,
    *  // state read
-   *  getMode?: ()=>string, // returns "rotate"|"move"|"orbit"
+   *  getMode?: ()=>string, // returns "rotate"|"move"|"orbit"|"scale"
    *  getShowOutline?: ()=>boolean,
    *  // hooks
    *  toast?: (msg:string, ms?:number)=>void,
@@ -109,7 +109,6 @@ export class SelectionController {
   }
 
   tick() {
-    // call per frame from render loop if you want outline to follow transforms
     if (this.selected && this.getShowOutline()) {
       this.outline.setFromObject(this.selected);
       this.outline.visible = true;
@@ -149,18 +148,62 @@ export class SelectionController {
   }
 
   onKeyDown(ev) {
-    // Escape is handled by your Help system too, but we keep selection behavior consistent:
     if (ev.key === "Escape") {
-      // if modal open, don't fight it (caller likely closes it)
       if (this.ui.helpModal && !this.ui.helpModal.classList.contains("hidden")) return;
       this.clearSelection();
       return;
     }
 
-    // F to focus
     if (ev.key.toLowerCase() === "f") {
       this.focusSelection();
     }
+  }
+
+  /* ---------------- picking ---------------- */
+
+  _isPickable(obj) {
+    if (!obj) return false;
+    if (!obj.userData || !obj.userData.pickable) return false;
+
+    // avoid accidentally selecting helpers/gizmo internals if they ever get marked
+    if (obj.userData.nonPickable) return false;
+    if (obj.userData.isGizmo) return false;
+    if (obj.type === "TransformControlsPlane" || obj.type === "TransformControlsGizmo") return false;
+
+    return true;
+  }
+
+  _collectPickablesInto(arr, root) {
+    if (!root || !root.traverse) return;
+    root.traverse((obj) => {
+      if (this._isPickable(obj)) arr.push(obj);
+    });
+  }
+
+  _resolveSelectionFromHit(hitObj) {
+    if (!hitObj) return null;
+
+    // If a mesh belongs to an imported root, always promote to that root
+    if (hitObj.userData?.importRoot) return hitObj.userData.importRoot;
+
+    // climb to joint group or prop root
+    let o = hitObj;
+    while (o) {
+      // imported model mesh can store importRoot on itself (common)
+      if (o.userData?.importRoot) return o.userData.importRoot;
+
+      // joints: return joint group (parent marked isJoint)
+      if (o.parent?.userData?.isJoint) return o.parent;
+
+      // props: if this object itself is the prop root
+      if (o.userData?.isImportedRoot) return o;
+      if (o.userData?.isProp && o.userData?.isImportedModel && o.userData?.importRoot) return o.userData.importRoot;
+      if (o.userData?.isProp) return o;
+
+      o = o.parent || null;
+    }
+
+    return hitObj;
   }
 
   pickFromPointer(ev) {
@@ -172,30 +215,24 @@ export class SelectionController {
 
     const pickables = [];
 
-    // character pickables
-    this.world.root?.traverse?.((obj) => {
-      if (obj?.userData?.pickable) pickables.push(obj);
-    });
+    // 1) character pickables
+    this._collectPickablesInto(pickables, this.world.root);
 
-    // props pickables
-    (this.world.props || []).forEach((p) => {
-      p?.traverse?.((obj) => {
-        if (obj?.userData?.pickable) pickables.push(obj);
-      });
-    });
+    // 2) registered props pickables
+    (this.world.props || []).forEach((p) => this._collectPickablesInto(pickables, p));
+
+    // 3) IMPORTANT: scene-wide pickables (covers imported models not registered in world.props)
+    this._collectPickablesInto(pickables, this.scene);
+
+    if (!pickables.length) return null;
 
     const hits = this.raycaster.intersectObjects(pickables, true);
     if (!hits.length) return null;
 
-    // climb to joint group or prop group (same logic as your app.js)
-    let o = hits[0].object;
-    while (o && o.parent) {
-      if (o.parent?.userData?.isJoint) return o.parent;
-      if (o.userData?.isProp) return o;
-      o = o.parent;
-    }
-    return hits[0].object;
+    return this._resolveSelectionFromHit(hits[0].object);
   }
+
+  /* ---------------- ui/helpers ---------------- */
 
   _syncUI() {
     if (!this.ui.selectionName) return;
