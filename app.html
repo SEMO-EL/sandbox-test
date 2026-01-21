@@ -8,11 +8,13 @@
   - UI + Canvas + Help Modal
   - Pose Gallery (thumbnails) using localStorage (no backend)
   - Preset Poses (built-in, no backend)
+  - ✅ Import 3D (.glb/.gltf)
+  - ✅ Lighting controls (intensity/color/direction + presets)
 -->
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <meta name="description" content="Pose Sandbox: pose a simple 3D character, place props, save/load poses, export PNG." />
+  <meta name="description" content="Pose Sandbox: pose a simple 3D character, place props, save/load poses, import models, export PNG." />
   <meta name="theme-color" content="#0b0f17" />
   <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
   <link rel="icon" type="image/png" sizes="48x48" href="./assets/favicon.png">
@@ -41,12 +43,18 @@
       <div class="brand__mark" aria-hidden="true">◼</div>
       <div class="brand__text">
         <div class="brand__title">Pose Sandbox</div>
-        <div class="brand__subtitle">Character posing • Props • Export</div>
+        <div class="brand__subtitle">Character posing • Props • Import • Export</div>
       </div>
     </div>
 
     <div class="topbar__actions">
       <a class="btn btn--ghost" href="./index.html" title="Back to landing">Home</a>
+
+      <!-- ✅ Import 3D -->
+      <button class="btn btn--ghost" id="btnImport3D" type="button" title="Import a .glb or .gltf model">
+        Import 3D
+      </button>
+      <input id="fileModel" type="file" accept=".glb,.gltf" hidden />
 
       <button class="btn btn--ghost" id="btnHelp" type="button" aria-haspopup="dialog" aria-controls="helpModal">
         Help
@@ -79,26 +87,12 @@
           <button class="btn" id="btnClear" type="button" title="Clear selection">Clear</button>
         </div>
 
-        <!-- ✅ Symmetry toggle -->
+        <!-- ✅ NEW: Symmetry toggle -->
         <div class="row">
           <button class="btn" id="btnSymmetry" type="button" title="Mirror body edits: L ↔ R">
             Symmetry: Off
           </button>
         </div>
-
-        <!-- ✅ NEW: 3D Import -->
-        <div class="row row--split">
-          <button class="btn" id="btnImportModel" type="button" title="Import a .glb or .gltf model">
-            Import 3D
-          </button>
-          <button class="btn" id="btnClearModels" type="button" title="Remove imported models">
-            Clear Models
-          </button>
-        </div>
-        <input id="fileModel" type="file"
-               accept=".glb,.gltf,.bin,.png,.jpg,.jpeg,.webp"
-               multiple
-               hidden />
       </section>
 
       <section class="panel__section">
@@ -145,11 +139,107 @@
         </div>
       </section>
 
+      <!-- ✅ NEW: Lighting -->
+      <section class="panel__section">
+        <h2 class="panel__title">Lighting</h2>
+        <div class="hint">
+          Adjust scene lights (strength + color + direction). Presets are a quick start.
+        </div>
+
+        <div class="row">
+          <label class="label" for="lightPreset">Preset</label>
+          <select id="lightPreset" class="select">
+            <option value="studio" selected>Studio</option>
+            <option value="flat">Flat</option>
+            <option value="moody">Moody</option>
+            <option value="rim">Rim</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label class="label" for="keyDir">Key direction</label>
+          <select id="keyDir" class="select">
+            <option value="front_right" selected>Front Right</option>
+            <option value="front_left">Front Left</option>
+            <option value="front">Front</option>
+            <option value="top">Top</option>
+            <option value="back_right">Back Right</option>
+            <option value="back_left">Back Left</option>
+          </select>
+        </div>
+
+        <div class="row row--split">
+          <div>
+            <label class="label" for="keyIntensity">Key</label>
+            <input id="keyIntensity" class="input" type="range" min="0" max="2" step="0.01" value="0.92" />
+          </div>
+          <div>
+            <label class="label" for="keyColor">Color</label>
+            <input id="keyColor" class="input" type="color" value="#ffffff" />
+          </div>
+        </div>
+
+        <div class="row row--split">
+          <div>
+            <label class="label" for="fillIntensity">Fill</label>
+            <input id="fillIntensity" class="input" type="range" min="0" max="2" step="0.01" value="0.30" />
+          </div>
+          <div>
+            <label class="label" for="fillColor">Color</label>
+            <input id="fillColor" class="input" type="color" value="#88bbff" />
+          </div>
+        </div>
+
+        <div class="row row--split">
+          <div>
+            <label class="label" for="rimIntensity">Rim</label>
+            <input id="rimIntensity" class="input" type="range" min="0" max="2" step="0.01" value="0.18" />
+          </div>
+          <div>
+            <label class="label" for="rimColor">Color</label>
+            <input id="rimColor" class="input" type="color" value="#aad9ff" />
+          </div>
+        </div>
+
+        <div class="row row--split">
+          <div>
+            <label class="label" for="ambIntensity">Ambient</label>
+            <input id="ambIntensity" class="input" type="range" min="0" max="2" step="0.01" value="0.22" />
+          </div>
+          <div>
+            <label class="label" for="ambColor">Color</label>
+            <input id="ambColor" class="input" type="color" value="#ffffff" />
+          </div>
+        </div>
+
+        <div class="row row--split">
+          <div>
+            <label class="label" for="hemiIntensity">Hemisphere</label>
+            <input id="hemiIntensity" class="input" type="range" min="0" max="2" step="0.01" value="0.35" />
+          </div>
+          <div>
+            <label class="label" for="hemiSky">Sky</label>
+            <input id="hemiSky" class="input" type="color" value="#9bb2ff" />
+          </div>
+        </div>
+
+        <div class="row">
+          <label class="label" for="hemiGround">Ground</label>
+          <input id="hemiGround" class="input" type="color" value="#151a22" />
+        </div>
+
+        <div class="row">
+          <button class="btn" id="btnResetLights" type="button" title="Reset lighting back to preset defaults">
+            Reset Lights
+          </button>
+        </div>
+      </section>
+
       <section class="panel__section">
         <h2 class="panel__title">Pose</h2>
 
         <div class="row row--split">
-          <button class="btn" id="btnResetPose" type="button" title="Reset joint transforms (move + rotate + scale)">Reset</button>
+          <button class="btn" id="btnResetPose" type="button" title="Reset pose (move + rotate + scale)">Reset</button>
           <button class="btn" id="btnRandomPose" type="button" title="Randomize pose (mild)">Random</button>
         </div>
 
@@ -265,13 +355,18 @@
             <option value="midnight" selected>Midnight</option>
             <option value="studio">Studio</option>
             <option value="graphite">Graphite</option>
+            <option value="dawn">Dawn</option>
+            <option value="mint">Mint</option>
+            <option value="sunset">Sunset</option>
+            <option value="white">White</option>
+            <option value="black">Black</option>
           </select>
         </div>
       </section>
 
       <section class="panel__section panel__section--footer">
         <div class="tiny">
-          Tip: <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd> = Rotate/Move/Orbit/Scale • <kbd>Esc</kbd> clears selection • <kbd>F</kbd> focus • <kbd>Del</kbd> deletes prop
+          Tip: <kbd>1</kbd>/<kbd>2</kbd>/<kbd>3</kbd>/<kbd>4</kbd> = Rotate/Move/Orbit/Scale • <kbd>Esc</kbd> clears selection • <kbd>F</kbd> focus • <kbd>Del</kbd> deletes prop • <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<kbd>M</kbd> symmetry
         </div>
         <div class="tiny tiny--muted">Built for GitHub Pages. No bundler. No nonsense.</div>
       </section>
@@ -299,13 +394,16 @@
       </div>
       <div class="modal__body">
         <ul class="help">
-          <li><b>Select:</b> click a joint or prop in the 3D view.</li>
+          <li><b>Select:</b> click a joint, prop, or imported model in the 3D view.</li>
           <li><b>Rotate:</b> use the gizmo rings. Toggle axes X/Y/Z. (<kbd>1</kbd>)</li>
           <li><b>Move:</b> switch to Move to translate the selected joint/prop. (<kbd>2</kbd>)</li>
           <li><b>Orbit:</b> use Orbit mode to move camera freely. (<kbd>3</kbd>)</li>
           <li><b>Scale:</b> scale props normally; for body joints it scales the visible mesh only. (<kbd>4</kbd>)</li>
           <li><b>Symmetry:</b> mirrors body edits L ↔ R (rotate + scale).</li>
-          <li><b>Import 3D:</b> import .glb/.gltf (select the .gltf AND its .bin/textures together if needed).</li>
+          <li><b>Import 3D:</b> loads a <code>.glb</code>/<code>.gltf</code> into the scene.</li>
+          <li><b>Lighting:</b> adjust intensities/colors/direction and try presets.</li>
+          <li><b>Save JSON:</b> downloads pose.json AND saves a thumbnail in gallery.</li>
+          <li><b>Save to Gallery:</b> saves locally without downloading.</li>
           <li><b>Export:</b> downloads a PNG of the current view.</li>
         </ul>
         <div class="help__note">
