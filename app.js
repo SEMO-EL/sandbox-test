@@ -5,6 +5,7 @@
 // ✅ True reset (move + rotate + scale) using rest snapshot.
 // ✅ Import 3D (.glb/.gltf) + selectable like a prop.
 // ✅ Lighting controls (intensity/color/direction + presets).
+// ✅ Reference Image overlay (camera-pinned) for pose matching.
 
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -25,7 +26,13 @@ import {
 } from "./core/world.js";
 
 import { createRenderer } from "./engine/renderer.js";
-import { createScene, setBackgroundTone, applyLightingPreset, setKeyDirectionByName } from "./engine/scene.js";
+import {
+  createScene,
+  setBackgroundTone,
+  applyLightingPreset,
+  setKeyDirectionByName,
+  createReferenceOverlay
+} from "./engine/scene.js";
 import { createLoop } from "./engine/loop.js";
 
 import { Gallery } from "./gallery/gallery.js";
@@ -107,6 +114,17 @@ const btnClearGallery = document.getElementById("btnClearGallery");
 const presetGallery = document.getElementById("presetGallery");
 const btnPresetApply = document.getElementById("btnPresetApply");
 const btnPresetSave = document.getElementById("btnPresetSave");
+
+/* ✅ Reference DOM */
+const btnRefLoad = document.getElementById("btnRefLoad");
+const btnRefClear = document.getElementById("btnRefClear");
+const fileRef = document.getElementById("fileRef");
+const refShow = document.getElementById("refShow");
+const refOpacity = document.getElementById("refOpacity");
+const refSize = document.getElementById("refSize");
+const refOffsetX = document.getElementById("refOffsetX");
+const refOffsetY = document.getElementById("refOffsetY");
+const refFlipX = document.getElementById("refFlipX");
 
 /* ---------------------------- Helpers ---------------------------- */
 const showToast = makeToast(toastEl);
@@ -195,6 +213,94 @@ try {
 
   // Background selector initial
   setBackgroundTone(scene, bgTone?.value || "midnight");
+
+  /* ✅ Reference overlay (camera pinned) */
+  const reference = createReferenceOverlay(scene, camera);
+
+  function syncReferenceUIFromState() {
+    if (!STATE.reference) return;
+    if (refShow) refShow.checked = !!STATE.reference.enabled;
+    if (refOpacity) refOpacity.value = String(STATE.reference.opacity ?? 0.65);
+    if (refSize) refSize.value = String(STATE.reference.size ?? 3.2);
+    if (refOffsetX) refOffsetX.value = String(STATE.reference.offsetX ?? 0);
+    if (refOffsetY) refOffsetY.value = String(STATE.reference.offsetY ?? 0);
+    if (refFlipX) refFlipX.checked = !!STATE.reference.flipX;
+  }
+
+  function applyReferenceStateToOverlay() {
+    if (!STATE.reference) return;
+
+    reference.setOpacity(STATE.reference.opacity);
+    reference.setSize(STATE.reference.size);
+    reference.setOffset(STATE.reference.offsetX, STATE.reference.offsetY);
+    reference.setFlipX(STATE.reference.flipX);
+
+    // Only show if enabled + has image
+    reference.setVisible(!!STATE.reference.enabled && reference.hasImage());
+  }
+
+  async function loadReferenceFile(file) {
+    if (!file) return;
+    try {
+      await reference.setImageFile(file);
+      STATE.reference.enabled = true;
+      applyReferenceStateToOverlay();
+      syncReferenceUIFromState();
+      showToast("Reference loaded");
+    } catch (e) {
+      console.warn(e);
+      showToast("Reference load failed", 1600);
+    }
+  }
+
+  btnRefLoad?.addEventListener("click", () => fileRef?.click?.());
+  fileRef?.addEventListener("change", async (e) => {
+    const file = e.target?.files?.[0];
+    if (!file) return;
+    await loadReferenceFile(file);
+    fileRef.value = "";
+  });
+
+  btnRefClear?.addEventListener("click", () => {
+    reference.clear();
+    STATE.reference.enabled = false;
+    syncReferenceUIFromState();
+    applyReferenceStateToOverlay();
+    showToast("Reference cleared");
+  });
+
+  refShow?.addEventListener("change", () => {
+    STATE.reference.enabled = !!refShow.checked;
+    applyReferenceStateToOverlay();
+  });
+
+  refOpacity?.addEventListener("input", () => {
+    STATE.reference.opacity = Number(refOpacity.value);
+    applyReferenceStateToOverlay();
+  });
+
+  refSize?.addEventListener("input", () => {
+    STATE.reference.size = Number(refSize.value);
+    applyReferenceStateToOverlay();
+  });
+
+  function applyOffsetsFromUI() {
+    STATE.reference.offsetX = Number(refOffsetX?.value ?? 0);
+    STATE.reference.offsetY = Number(refOffsetY?.value ?? 0);
+    applyReferenceStateToOverlay();
+  }
+
+  refOffsetX?.addEventListener("input", applyOffsetsFromUI);
+  refOffsetY?.addEventListener("input", applyOffsetsFromUI);
+
+  refFlipX?.addEventListener("change", () => {
+    STATE.reference.flipX = !!refFlipX.checked;
+    applyReferenceStateToOverlay();
+  });
+
+  // init reference UI + overlay
+  syncReferenceUIFromState();
+  applyReferenceStateToOverlay();
 
   /* Character */
   function makeMaterial(colorHex) {
@@ -306,26 +412,25 @@ try {
   STATE.axis = { ...modes.state.axis };
   STATE.snapDeg = modes.state.snapDeg;
 
- function getGizmoTargetForSelection(sel) {
-  if (!sel) return null;
-  if (STATE.mode === "orbit") return null;
+  function getGizmoTargetForSelection(sel) {
+    if (!sel) return null;
+    if (STATE.mode === "orbit") return null;
 
-  // ✅ imported mesh clicked? scale/rotate/move the import root
-  if (sel.userData?.importRoot && sel.userData.importRoot.userData?.isImportedRoot) {
-    return sel.userData.importRoot;
-  }
-
-  if (STATE.mode === "scale") {
-    if (sel.userData?.isProp) return sel;
-    if (sel.userData?.isJoint) {
-      const mesh = findFirstPickableMesh(sel);
-      return mesh || sel;
+    // ✅ imported mesh clicked? scale/rotate/move the import root
+    if (sel.userData?.importRoot && sel.userData.importRoot.userData?.isImportedRoot) {
+      return sel.userData.importRoot;
     }
+
+    if (STATE.mode === "scale") {
+      if (sel.userData?.isProp) return sel;
+      if (sel.userData?.isJoint) {
+        const mesh = findFirstPickableMesh(sel);
+        return mesh || sel;
+      }
+    }
+
+    return sel;
   }
-
-  return sel;
-}
-
 
   function attachGizmoForCurrentMode() {
     const sel = selection.getSelected();
@@ -804,7 +909,6 @@ try {
     if (hemiSky) lights.hemi.color.setHex(colorInputToHex(hemiSky.value));
     if (hemiGround) lights.hemi.groundColor.setHex(colorInputToHex(hemiGround.value));
 
-    // key direction dropdown
     if (keyDir) setKeyDirectionByName(lights, keyDir.value);
 
     renderer.render(scene, camera);
@@ -815,7 +919,6 @@ try {
     const preset = String(name || "studio");
     applyLightingPreset(lights, preset);
 
-    // keep direction dropdown coherent for "studio"
     if (keyDir && preset === "studio") keyDir.value = "front_right";
 
     syncLightingUIFromLights();
@@ -839,7 +942,6 @@ try {
     setLightingPreset(preset);
   });
 
-  // init lighting UI from current scene defaults
   syncLightingUIFromLights();
 
   /* ---------------------------- UI wiring ---------------------------- */
@@ -912,18 +1014,17 @@ try {
   /* ---------------------------- Input routing ---------------------------- */
 
   input.on("pointerdown", (evt) => {
-  selection.onPointerDown(evt.originalEvent);
+    selection.onPointerDown(evt.originalEvent);
 
-  // ✅ If a child mesh of an imported model is selected, promote to the import root
-  const sel = selection.getSelected?.();
-  const root = sel?.userData?.importRoot;
-  if (root && root.userData?.isImportedRoot) {
-    selection.setSelection(root);
-  }
+    // ✅ If a child mesh of an imported model is selected, promote to the import root
+    const sel = selection.getSelected?.();
+    const root = sel?.userData?.importRoot;
+    if (root && root.userData?.isImportedRoot) {
+      selection.setSelection(root);
+    }
 
-  attachGizmoForCurrentMode();
-});
-
+    attachGizmoForCurrentMode();
+  });
 
   input.on("keydown", (evt) => {
     const e = evt.originalEvent;
@@ -938,7 +1039,6 @@ try {
       return;
     }
 
-    // modes
     if (k === "1" || k === "2" || k === "3" || k === "4") {
       modes.handleShortcut(k);
       return;
@@ -954,14 +1054,12 @@ try {
       return;
     }
 
-    // Ctrl/Cmd + S => save to gallery
     if ((e.ctrlKey || e.metaKey) && k === "s") {
       e.preventDefault();
       gallery.saveCurrentPoseToGallery({ withToast: true });
       return;
     }
 
-    // Ctrl/Cmd + M => toggle symmetry quickly
     if ((e.ctrlKey || e.metaKey) && k === "m") {
       e.preventDefault();
       SYM.enabled = !SYM.enabled;
@@ -1009,7 +1107,6 @@ try {
   if (gridHelper) gridHelper.visible = !!STATE.showGrid;
   if (axesHelper) axesHelper.visible = !!STATE.showAxes;
 
-  // Init lighting preset from dropdown (keeps UI + scene in sync)
   setLightingPreset(lightPreset?.value || "studio");
 
   showToast("Ready. Click a joint or prop to pose.");
