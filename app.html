@@ -1,16 +1,6 @@
 <!-- app.html -->
 <!DOCTYPE html>
 <html lang="en">
-<!--
-  Pose Sandbox — GitHub Pages friendly
-  - ES Modules + Import Map
-  - Three.js + OrbitControls + TransformControls
-  - UI + Canvas + Help Modal
-  - Pose Gallery (thumbnails) using localStorage (no backend)
-  - Preset Poses (built-in, no backend)
-  - ✅ Import 3D (.glb/.gltf)
-  - ✅ Lighting controls (intensity/color/direction + presets)
--->
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
@@ -50,7 +40,6 @@
     <div class="topbar__actions">
       <a class="btn btn--ghost" href="./index.html" title="Back to landing">Home</a>
 
-      <!-- ✅ Import 3D -->
       <button class="btn btn--ghost" id="btnImport3D" type="button" title="Import a .glb or .gltf model">
         Import 3D
       </button>
@@ -87,7 +76,6 @@
           <button class="btn" id="btnClear" type="button" title="Clear selection">Clear</button>
         </div>
 
-        <!-- ✅ NEW: Symmetry toggle -->
         <div class="row">
           <button class="btn" id="btnSymmetry" type="button" title="Mirror body edits: L ↔ R">
             Symmetry: Off
@@ -139,7 +127,60 @@
         </div>
       </section>
 
-      <!-- ✅ NEW: Lighting -->
+      <!-- ✅ NEW: Reference Image -->
+      <section class="panel__section">
+        <h2 class="panel__title">Reference</h2>
+        <div class="hint">
+          Load a 2D reference image and pin it to the camera for pose matching.
+        </div>
+
+        <div class="row row--split">
+          <button class="btn" id="btnRefLoad" type="button" title="Load a reference image (png/jpg/webp)">
+            Load Image
+          </button>
+          <button class="btn" id="btnRefClear" type="button" title="Clear reference image">
+            Clear
+          </button>
+        </div>
+
+        <input id="fileRef" type="file" accept="image/*" hidden />
+
+        <div class="row">
+          <label class="toggle">
+            <input id="refShow" type="checkbox" />
+            <span>Show reference</span>
+          </label>
+        </div>
+
+        <div class="row">
+          <label class="label" for="refOpacity">Opacity</label>
+          <input id="refOpacity" class="input" type="range" min="0" max="1" step="0.01" value="0.65" />
+        </div>
+
+        <div class="row">
+          <label class="label" for="refSize">Size</label>
+          <input id="refSize" class="input" type="range" min="1" max="7" step="0.05" value="3.2" />
+        </div>
+
+        <div class="row">
+          <label class="label" for="refOffsetX">Offset X</label>
+          <input id="refOffsetX" class="input" type="range" min="-4" max="4" step="0.01" value="0" />
+        </div>
+
+        <div class="row">
+          <label class="label" for="refOffsetY">Offset Y</label>
+          <input id="refOffsetY" class="input" type="range" min="-3" max="3" step="0.01" value="0" />
+        </div>
+
+        <div class="row">
+          <label class="toggle">
+            <input id="refFlipX" type="checkbox" />
+            <span>Flip horizontally</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- ✅ Lighting -->
       <section class="panel__section">
         <h2 class="panel__title">Lighting</h2>
         <div class="hint">
@@ -235,6 +276,9 @@
         </div>
       </section>
 
+      <!-- Pose / Presets / Gallery / Props sections remain unchanged below -->
+      <!-- (kept exactly as your original, omitted here would be wrong — so kept) -->
+
       <section class="panel__section">
         <h2 class="panel__title">Pose</h2>
 
@@ -263,7 +307,6 @@
         </div>
       </section>
 
-      <!-- Preset Poses -->
       <section class="panel__section">
         <h2 class="panel__title">Preset Poses</h2>
         <div class="hint">
@@ -384,7 +427,6 @@
     </section>
   </main>
 
-  <!-- Help modal -->
   <div class="modal hidden" id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
     <div class="modal__backdrop" data-close="true"></div>
     <div class="modal__card">
@@ -405,6 +447,7 @@
           <li><b>Save JSON:</b> downloads pose.json AND saves a thumbnail in gallery.</li>
           <li><b>Save to Gallery:</b> saves locally without downloading.</li>
           <li><b>Export:</b> downloads a PNG of the current view.</li>
+          <li><b>Reference:</b> load an image and pin it to the camera for matching poses.</li>
         </ul>
         <div class="help__note">
           If your screen is blank, hard-refresh (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>) and check Console.
