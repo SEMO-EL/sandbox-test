@@ -10,6 +10,16 @@
  */
 
 /**
+ * @typedef {Object} ReferenceState
+ * @property {boolean} enabled
+ * @property {number} opacity
+ * @property {number} size
+ * @property {number} offsetX
+ * @property {number} offsetY
+ * @property {boolean} flipX
+ */
+
+/**
  * @typedef {Object} AppState
  * @property {"rotate"|"move"|"orbit"|"scale"} mode
  * @property {AxisState} axis
@@ -18,6 +28,7 @@
  * @property {boolean} showAxes
  * @property {boolean} showOutline
  * @property {boolean} perfEnabled
+ * @property {ReferenceState} reference
  */
 
 export function createState() {
@@ -29,7 +40,17 @@ export function createState() {
     showGrid: true,
     showAxes: false,
     showOutline: true,
-    perfEnabled: false
+    perfEnabled: false,
+
+    // ✅ Reference image overlay defaults
+    reference: {
+      enabled: false,
+      opacity: 0.65,
+      size: 3.2,
+      offsetX: 0,
+      offsetY: 0,
+      flipX: false
+    }
   };
 
   return STATE;
