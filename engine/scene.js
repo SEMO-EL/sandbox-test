@@ -351,9 +351,9 @@ export function createScene({
   /* ===================== ✅ Smooth zoom tuning + safe bounds ===================== */
   // Smoothness: reduce zoom aggressiveness so wheel doesn't jump between "too close" and "too far".
   // Bounds: keep distance range "artist-friendly" for a single character scene.
-  orbit.zoomSpeed = 0.55;     // smoother (default ~1.0 feels jumpy on many mice/trackpads)
-  orbit.minDistance = 2.0;    // not nose-inside-the-model
-  orbit.maxDistance = 18.0;   // far enough to frame full body + props without losing the scene
+  orbit.zoomSpeed = 0.25;     // smoother (default ~1.0 feels jumpy on many mice/trackpads)
+  orbit.minDistance = 0.5;    // not nose-inside-the-model
+  orbit.maxDistance = 30.0;   // far enough to frame full body + props without losing the scene
 
   // Extra guard: never allow distance to exceed camera.far safety margin.
   // IMPORTANT: do it softly (lerp) so it doesn't "snap" and feel harsh.
