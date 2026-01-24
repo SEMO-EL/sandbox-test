@@ -27,15 +27,28 @@ export function setKeyDirectionByName(lights, name) {
   if (!lights?.key) return;
 
   const n = String(name || "front_right");
-  const pos = new THREE.Vector3(6, 10, 3);
+  const pos = new THREE.Vector3(6, 10, 3); // default
 
   switch (n) {
-    case "front_left": pos.set(-6, 10, 3); break;
-    case "front": pos.set(0, 10, 7); break;
-    case "top": pos.set(0, 14, 0); break;
-    case "back_right": pos.set(6, 8, -7); break;
-    case "back_left": pos.set(-6, 8, -7); break;
-    default: pos.set(6, 10, 3); break;
+    case "front_left":
+      pos.set(-6, 10, 3);
+      break;
+    case "front":
+      pos.set(0, 10, 7);
+      break;
+    case "top":
+      pos.set(0, 14, 0);
+      break;
+    case "back_right":
+      pos.set(6, 8, -7);
+      break;
+    case "back_left":
+      pos.set(-6, 8, -7);
+      break;
+    case "front_right":
+    default:
+      pos.set(6, 10, 3);
+      break;
   }
 
   lights.key.position.copy(pos);
@@ -46,6 +59,7 @@ export function applyLightingPreset(lights, presetName) {
 
   const name = String(presetName || "studio").toLowerCase();
 
+  // Defaults = "studio" (matches your original scene.js rig)
   const studio = () => {
     lights.hemi.color.setHex(0x9bb2ff);
     lights.hemi.groundColor.setHex(0x151a22);
@@ -128,6 +142,183 @@ export function applyLightingPreset(lights, presetName) {
   else studio();
 }
 
+/* ===================== Reference Overlay (camera pinned) ===================== */
+
+export function createReferenceOverlay(scene, camera) {
+  if (!scene || !camera) throw new Error("createReferenceOverlay: scene + camera required");
+
+  // Ensure camera is part of scene graph so its children update reliably
+  // (safe; doesn't change rendering logic)
+  try {
+    if (!camera.parent) scene.add(camera);
+  } catch {}
+
+  const group = new THREE.Group();
+  group.name = "reference_overlay_group";
+  group.renderOrder = 9999;
+
+  const material = new THREE.SpriteMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.65,
+    depthTest: false,
+    depthWrite: false
+  });
+
+  const sprite = new THREE.Sprite(material);
+  sprite.name = "reference_sprite";
+  sprite.visible = false;
+
+  // Make 100% non-pickable (your picker requires userData.pickable === true)
+  sprite.userData.nonPickable = true;
+  sprite.userData.pickable = false;
+
+  // Position in front of camera (camera local space)
+  sprite.position.set(0, 0, -6);
+
+  group.add(sprite);
+  camera.add(group);
+
+  let _tex = null;
+  let _url = null;
+  let _aspect = 1; // width/height
+  let _size = 3.2; // base height in world units (camera space)
+  let _offsetX = 0;
+  let _offsetY = 0;
+  let _opacity = 0.65;
+  let _flipX = false;
+
+  function _applyScaleAndOffset() {
+    // Sprite scale is in world units; keep height = _size, width = _size * aspect
+    const h = Math.max(0.2, _size);
+    const w = Math.max(0.2, _size * (_aspect || 1));
+    sprite.scale.set(w, h, 1);
+
+    sprite.position.x = _offsetX;
+    sprite.position.y = _offsetY;
+  }
+
+  function _applyOpacity() {
+    material.opacity = Math.max(0, Math.min(1, _opacity));
+    material.transparent = material.opacity < 1 || !!material.map;
+    material.needsUpdate = true;
+  }
+
+  function _applyFlip() {
+    const map = material.map;
+    if (!map) return;
+
+    map.wrapS = THREE.ClampToEdgeWrapping;
+    map.wrapT = THREE.ClampToEdgeWrapping;
+
+    if (_flipX) {
+      map.repeat.x = -1;
+      map.offset.x = 1;
+    } else {
+      map.repeat.x = 1;
+      map.offset.x = 0;
+    }
+    map.needsUpdate = true;
+  }
+
+  function clear() {
+    sprite.visible = false;
+
+    if (_url) {
+      try { URL.revokeObjectURL(_url); } catch {}
+      _url = null;
+    }
+
+    if (_tex) {
+      try { _tex.dispose(); } catch {}
+      _tex = null;
+    }
+
+    material.map = null;
+    material.needsUpdate = true;
+  }
+
+  function setVisible(v) {
+    sprite.visible = !!v && !!material.map;
+  }
+
+  function setOpacity(v) {
+    const n = Number(v);
+    if (Number.isFinite(n)) _opacity = n;
+    _applyOpacity();
+  }
+
+  function setSize(v) {
+    const n = Number(v);
+    if (Number.isFinite(n)) _size = n;
+    _applyScaleAndOffset();
+  }
+
+  function setOffset(x, y) {
+    const nx = Number(x);
+    const ny = Number(y);
+    if (Number.isFinite(nx)) _offsetX = nx;
+    if (Number.isFinite(ny)) _offsetY = ny;
+    _applyScaleAndOffset();
+  }
+
+  function setFlipX(v) {
+    _flipX = !!v;
+    _applyFlip();
+  }
+
+  async function setImageFile(file) {
+    if (!file) return;
+
+    clear();
+
+    _url = URL.createObjectURL(file);
+
+    // Load as HTMLImageElement (fast + compatible)
+    const img = new Image();
+    img.decoding = "async";
+    img.loading = "eager";
+
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = _url;
+    });
+
+    _aspect = (img.naturalWidth || img.width || 1) / (img.naturalHeight || img.height || 1);
+
+    const tex = new THREE.Texture(img);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.needsUpdate = true;
+
+    _tex = tex;
+    material.map = tex;
+
+    _applyFlip();
+    _applyOpacity();
+    _applyScaleAndOffset();
+
+    sprite.visible = true;
+    material.needsUpdate = true;
+  }
+
+  // init
+  _applyOpacity();
+  _applyScaleAndOffset();
+
+  return {
+    sprite,
+    clear,
+    setVisible,
+    setOpacity,
+    setSize,
+    setOffset,
+    setFlipX,
+    setImageFile,
+    hasImage: () => !!material.map
+  };
+}
+
 /* ===================== createScene ===================== */
 
 export function createScene({
@@ -154,17 +345,48 @@ export function createScene({
   camera.position.set(4.6, 3.7, 6.2);
   camera.lookAt(0, 1.1, 0);
 
-  // Orbit controls ✅ FIX HERE
+  // Orbit controls
   const orbit = new OrbitControls(camera, renderer.domElement);
   orbit.enableDamping = true;
   orbit.dampingFactor = 0.06;
   orbit.target.set(0, 1.05, 0);
 
-  // 🔒 Prevent zooming into the void
-  orbit.minDistance = 1.5;
-  orbit.maxDistance = 20;
+  /* ===================== ✅ FIX: Prevent zooming into blank screen ===================== */
+  // Without bounds, users can zoom far enough that everything is clipped by camera.far.
+  // Keep values sane for a character posing scene (still far enough for props).
+  orbit.minDistance = 1.2;
+  orbit.maxDistance = 40;
 
-  // Lighting
+  // Extra guard: if maxDistance ever changes elsewhere, never let distance exceed camera.far
+  // This prevents "blank screen" even if someone later sets maxDistance too high.
+  let _clampGuard = false;
+  orbit.addEventListener("change", () => {
+    if (_clampGuard) return;
+    _clampGuard = true;
+    try {
+      const d = camera.position.distanceTo(orbit.target);
+      const hardMax = Math.max(2, (camera.far || 200) * 0.92);
+
+      // Prefer orbit.maxDistance if defined; still never exceed camera.far safety range.
+      const targetMax = Math.min(
+        Number.isFinite(orbit.maxDistance) ? orbit.maxDistance : Infinity,
+        hardMax
+      );
+
+      if (d > targetMax) {
+        const dir = camera.position.clone().sub(orbit.target).normalize();
+        camera.position.copy(orbit.target.clone().add(dir.multiplyScalar(targetMax)));
+        // no orbit.update() here (avoid recursion); the next frame will settle.
+      }
+    } catch {
+      // ignore
+    } finally {
+      _clampGuard = false;
+    }
+  });
+  /* ================================================================================ */
+
+  // Lighting (store refs for UI)
   const hemi = new THREE.HemisphereLight(0x9bb2ff, 0x151a22, 0.35);
   scene.add(hemi);
 
@@ -197,16 +419,15 @@ export function createScene({
 
   const lights = { hemi, ambient, key, fill, rim };
 
-  // Floor
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(50, 50),
-    new THREE.MeshStandardMaterial({
-      color: 0x131826,
-      metalness: 0.05,
-      roughness: 0.95
-    })
-  );
+  // Floor + grid + axes
+  const floorMat = new THREE.MeshStandardMaterial({
+    color: 0x131826,
+    metalness: 0.05,
+    roughness: 0.95
+  });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), floorMat);
   floor.rotation.x = -Math.PI / 2;
+  floor.position.y = 0;
   floor.receiveShadow = true;
   scene.add(floor);
 
@@ -218,29 +439,53 @@ export function createScene({
   axesHelper.visible = false;
   scene.add(axesHelper);
 
+  // Raycaster + pointer
+  const raycaster = new THREE.Raycaster();
+  const pointer = new THREE.Vector2();
+
+  // Transform controls (gizmo)
   const gizmo = new TransformControls(camera, renderer.domElement);
   gizmo.setMode("rotate");
   gizmo.setSpace("local");
   gizmo.size = 0.85;
 
   gizmo.addEventListener("dragging-changed", (e) => {
-    orbit.enabled = !e.value;
-    if (e.value && showToast) showToast("Transforming…");
+    if (orbit) orbit.enabled = !e.value && (STATE?.mode === "orbit");
+    if (e.value && typeof showToast === "function") {
+      const m = STATE?.mode;
+      showToast(m === "move" ? "Moving…" : m === "scale" ? "Scaling…" : "Rotating…");
+    }
   });
 
   scene.add(gizmo);
 
+  // Outline helper
   const outline = new THREE.BoxHelper(new THREE.Object3D(), 0x24d2ff);
   outline.visible = false;
   scene.add(outline);
 
-  if (onPointerDown) window.addEventListener("pointerdown", onPointerDown);
-  if (onKeyDown) window.addEventListener("keydown", onKeyDown);
+  // Hook events (optional)
+  if (typeof onPointerDown === "function") window.addEventListener("pointerdown", onPointerDown);
+  if (typeof onKeyDown === "function") window.addEventListener("keydown", onKeyDown);
 
+  // Initial visibility derived from STATE if provided
   if (STATE) {
     gridHelper.visible = !!STATE.showGrid;
     axesHelper.visible = !!STATE.showAxes;
   }
+
+  /* ===================== ✅ Additive feature: create & return reference overlay ===================== */
+  // This does NOT break anything:
+  // - The sprite starts hidden until an image is set
+  // - It is non-pickable
+  // - Returning extra fields is safe for existing callers
+  let referenceOverlay = null;
+  try {
+    referenceOverlay = createReferenceOverlay(scene, camera);
+  } catch {
+    referenceOverlay = null;
+  }
+  /* =============================================================================================== */
 
   return {
     scene,
@@ -250,7 +495,10 @@ export function createScene({
     axesHelper,
     gridHelper,
     outline,
+    raycaster,
+    pointer,
     floor,
-    lights
+    lights,
+    referenceOverlay
   };
 }
