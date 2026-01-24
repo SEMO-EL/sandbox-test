@@ -353,7 +353,7 @@ export function createScene({
   // Bounds: keep distance range "artist-friendly" for a single character scene.
   orbit.zoomSpeed = 0.05;     // smoother (default ~1.0 feels jumpy on many mice/trackpads)
   orbit.minDistance = 0.5;    // not nose-inside-the-model
-  orbit.maxDistance = 30.0;   // far enough to frame full body + props without losing the scene
+  orbit.maxDistance = 50.0;   // far enough to frame full body + props without losing the scene
 
   // Extra guard: never allow distance to exceed camera.far safety margin.
   // IMPORTANT: do it softly (lerp) so it doesn't "snap" and feel harsh.
