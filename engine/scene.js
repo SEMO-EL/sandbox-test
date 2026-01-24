@@ -3,6 +3,7 @@
 // ✅ Exposes lights + small helpers for lighting presets + key direction.
 // ✅ Background tones expanded.
 // ✅ Reference image overlay (camera-pinned, non-pickable).
+// ✅ Smooth wheel zoom (custom dolly with easing) while keeping OrbitControls for rotate/pan/touch.
 
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -148,7 +149,6 @@ export function createReferenceOverlay(scene, camera) {
   if (!scene || !camera) throw new Error("createReferenceOverlay: scene + camera required");
 
   // Ensure camera is part of scene graph so its children update reliably
-  // (safe; doesn't change rendering logic)
   try {
     if (!camera.parent) scene.add(camera);
   } catch {}
@@ -348,44 +348,106 @@ export function createScene({
   orbit.dampingFactor = 0.06;
   orbit.target.set(0, 1.05, 0);
 
-  /* ===================== ✅ Smooth zoom tuning + safe bounds ===================== */
-  // Smoothness: reduce zoom aggressiveness so wheel doesn't jump between "too close" and "too far".
-  // Bounds: keep distance range "artist-friendly" for a single character scene.
-  orbit.zoomSpeed = 0.05;     // smoother (default ~1.0 feels jumpy on many mice/trackpads)
-  orbit.minDistance = 0.5;    // not nose-inside-the-model
-  orbit.maxDistance = 50.0;   // far enough to frame full body + props without losing the scene
+  /* ===================== Distance bounds (your working part) ===================== */
+  orbit.minDistance = 2.0;
+  orbit.maxDistance = 18.0;
 
-  // Extra guard: never allow distance to exceed camera.far safety margin.
-  // IMPORTANT: do it softly (lerp) so it doesn't "snap" and feel harsh.
-  let _clampGuard = false;
-  const _tmpDir = new THREE.Vector3();
-  const _tmpPos = new THREE.Vector3();
+  /* ===================== ✅ Smooth wheel zoom (custom) ===================== */
+  // OrbitControls wheel zoom is step-based (mouse wheels feel jumpy).
+  // We intercept wheel early (capture phase), stop OrbitControls' wheel handler,
+  // then ease camera distance toward a target distance.
 
-  orbit.addEventListener("change", () => {
-    if (_clampGuard) return;
-    _clampGuard = true;
-    try {
-      const d = camera.position.distanceTo(orbit.target);
-      const hardMax = Math.max(orbit.minDistance + 0.5, (camera.far || 200) * 0.85);
-      const targetMax = Math.min(
-        Number.isFinite(orbit.maxDistance) ? orbit.maxDistance : Infinity,
-        hardMax
-      );
+  // Tuning knobs (safe defaults)
+  const WHEEL_SENSITIVITY = 0.00135; // lower = slower zoom per wheel tick
+  const ZOOM_EASE = 0.18;            // higher = snappier, lower = smoother
+  const ZOOM_STOP_EPS = 0.0015;      // how close before we stop animating
 
-      if (d > targetMax) {
-        _tmpDir.copy(camera.position).sub(orbit.target).normalize();
-        _tmpPos.copy(orbit.target).add(_tmpDir.multiplyScalar(targetMax));
+  const _vDir = new THREE.Vector3();
+  const _vDesiredPos = new THREE.Vector3();
 
-        // Soft approach: move partway toward the clamped position (feels smooth, no jump).
-        camera.position.lerp(_tmpPos, 0.18);
-      }
-    } catch {
-      // ignore
-    } finally {
-      _clampGuard = false;
+  let _desiredDistance = camera.position.distanceTo(orbit.target);
+  let _zoomRaf = 0;
+
+  function _clamp(v, a, b) {
+    return Math.max(a, Math.min(b, v));
+  }
+
+  function _getHardMaxDistance() {
+    // Never allow distance beyond far plane margin (prevents "blank screen").
+    const far = Number.isFinite(camera.far) ? camera.far : 200;
+    const hardMax = Math.max(orbit.minDistance + 0.5, far * 0.85);
+    const maxD = Number.isFinite(orbit.maxDistance) ? orbit.maxDistance : hardMax;
+    return Math.min(maxD, hardMax);
+  }
+
+  function _ensureDesiredDistanceInRange() {
+    const hardMax = _getHardMaxDistance();
+    _desiredDistance = _clamp(_desiredDistance, orbit.minDistance, hardMax);
+  }
+
+  function _animateZoom() {
+    _zoomRaf = 0;
+
+    _ensureDesiredDistanceInRange();
+
+    const currentDistance = camera.position.distanceTo(orbit.target);
+    const hardMax = _getHardMaxDistance();
+    const targetDistance = _clamp(_desiredDistance, orbit.minDistance, hardMax);
+
+    // If already close enough, stop.
+    if (Math.abs(currentDistance - targetDistance) <= Math.max(ZOOM_STOP_EPS, targetDistance * 0.0008)) {
+      return;
     }
+
+    // Move camera along its view line to orbit.target
+    _vDir.copy(camera.position).sub(orbit.target).normalize();
+    _vDesiredPos.copy(orbit.target).add(_vDir.multiplyScalar(targetDistance));
+
+    // Ease position (smooth)
+    camera.position.lerp(_vDesiredPos, ZOOM_EASE);
+
+    // Keep OrbitControls coherent
+    orbit.update();
+
+    // Continue animating until we converge
+    _zoomRaf = requestAnimationFrame(_animateZoom);
+  }
+
+  function _onWheelCapture(ev) {
+    // Only zoom when NOT in orbit mode? (your app uses mode "orbit" to enable orbit movement)
+    // But wheel zoom is useful in any mode; keep it always.
+    if (!orbit || !camera) return;
+
+    // Stop OrbitControls wheel handler (must happen in capture phase)
+    try { ev.preventDefault(); } catch {}
+    try { ev.stopImmediatePropagation(); } catch {}
+
+    // Normalize delta across devices (mouse vs trackpad)
+    // deltaMode: 0=pixels, 1=lines, 2=pages
+    const dm = ev.deltaMode || 0;
+    const delta = ev.deltaY * (dm === 1 ? 16 : dm === 2 ? 200 : 1);
+
+    // Exponential zoom factor feels more natural than linear
+    const currentDistance = camera.position.distanceTo(orbit.target);
+    const hardMax = _getHardMaxDistance();
+
+    // factor < 1 => zoom in, factor > 1 => zoom out
+    // Positive deltaY typically means zoom out
+    const factor = Math.exp(delta * WHEEL_SENSITIVITY);
+
+    _desiredDistance = _clamp(currentDistance * factor, orbit.minDistance, hardMax);
+
+    if (!_zoomRaf) _zoomRaf = requestAnimationFrame(_animateZoom);
+  }
+
+  // IMPORTANT: capture:true so we run before OrbitControls' own listener.
+  renderer.domElement.addEventListener("wheel", _onWheelCapture, { passive: false, capture: true });
+
+  // If something changes maxDistance/minDistance later, keep desiredDistance sane
+  orbit.addEventListener("change", () => {
+    _ensureDesiredDistanceInRange();
   });
-  /* ============================================================================ */
+  /* ===================================================================== */
 
   // Lighting (store refs for UI)
   const hemi = new THREE.HemisphereLight(0x9bb2ff, 0x151a22, 0.35);
@@ -475,14 +537,14 @@ export function createScene({
     axesHelper.visible = !!STATE.showAxes;
   }
 
-  /* ===================== ✅ Additive: create & return reference overlay ===================== */
+  /* ===================== Additive: create & return reference overlay ===================== */
   let referenceOverlay = null;
   try {
     referenceOverlay = createReferenceOverlay(scene, camera);
   } catch {
     referenceOverlay = null;
   }
-  /* ======================================================================================== */
+  /* ====================================================================================== */
 
   return {
     scene,
